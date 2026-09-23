@@ -1,0 +1,83 @@
+<script setup lang="ts">
+import { ref, defineProps, defineEmits, useAttrs } from 'vue';
+import { SearchIcon, XCircleIcon } from '@adersolutions/icons';
+import { useDebounce } from '@shared/hooks';
+import { Spinner } from '@shared/components';
+
+// Define interface for props
+interface SearchProps {
+    modelValue: string | undefined;
+    loading?: boolean;
+    autofocus?: boolean;
+    placeholder?: string;
+    classOverride?: string;
+}
+
+// Define interface for emitted events
+interface SearchEmits {
+    (event: 'update:modelValue', value: string): void;
+    (event: 'change', value: string): void;
+}
+
+// Define props with types using the interface
+defineProps<SearchProps>();
+
+// Define emits using the interface
+const emit = defineEmits<SearchEmits>();
+
+// Set up state and hooks
+const attrs = useAttrs() as Record<string, unknown>;
+const isInputFocused = ref(false);
+const debounce = useDebounce(800);
+
+// Handle input change
+const onChange = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    emit('update:modelValue', target.value);
+};
+
+// Debounced search function
+const handleSearch = debounce((e: Event) => {
+    const target = e.target as HTMLInputElement;
+    emit('change', target.value);
+});
+
+// Handle clear button click
+const handleClear = () => {
+    emit('update:modelValue', '');
+    emit('change', '');
+};
+</script>
+<template>
+    <div class="flex items-center relative">
+        <div class="relative rounded-lg flex-1 flex gap-3 h-full">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <SearchIcon class="h-5 pr-1.5 absolute left-2 top-1/2 -mt-2.5 opacity-70 border-gray-300 fill-current" />
+            </div>
+
+            <input
+                :value="modelValue"
+                type="text"
+                name="search"
+                placeholder="Recherche avec mot-clé"
+                class="pl-10 bg-transparent focus:ring-slate-900 block h-full w-full rounded-md border-0 py-3 pr-3 ring-inset focus:ring-2 focus:ring-inset text-sm sm:leading-6"
+                v-bind="attrs"
+                :autofocus="autofocus"
+                @input="handleSearch"
+                @keyup="onChange"
+                @focus="isInputFocused = true"
+                @blur="isInputFocused = false"
+            />
+        </div>
+        <Spinner v-if="loading" class="w-8 absolute right-2 p-1.5 top-1/2 -mt-4 fill-orange-500 text-gray-400" />
+        <button
+            v-else-if="modelValue"
+            :class="{ 'opacity-0': (!isInputFocused || loading) && !modelValue }"
+            type="button"
+            class="absolute right-2 top-1/2 -mt-2.5"
+            @click.stop="handleClear"
+        >
+            <XCircleIcon class="h-5 pr-1.5 opacity-70 border-gray-300 fill-current" />
+        </button>
+    </div>
+</template>

@@ -1,0 +1,1 @@
+import{F as o}from"./index-_dfO7cyu.js";import{a as s,c as n,o as r,b as a,e as t,a6 as l,F as m}from"./useAlert-Dl0GyuCe.js";const d=s({__name:"ResetPassword",props:{email:Object,token:String},setup(e){return(i,c)=>(r(),n(m,null,[a(t(l),{title:"Réinitialiser le mot de passe"}),a(t(o),{email:e.email,token:e.token},null,8,["email","token"])],64))}});export{d as default};

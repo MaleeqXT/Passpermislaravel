@@ -1,0 +1,1 @@
+const o=a=>{let t=0;return a&&a.forEach(r=>{var e;t+=parseInt(((e=r.offer)==null?void 0:e.final_price)??0)}),t},l=a=>{let t=0;return a&&a.forEach(r=>{var e;t+=((e=r.offer)==null?void 0:e.balance)??0}),t};export{o as a,l as g};

@@ -1,0 +1,99 @@
+:root{
+    --p-shadow-button-inset: -0.0625rem 0rem 0.0625rem 0rem rgba(26, 26, 26, .122) inset, 0.0625rem 0rem 0.0625rem 0rem rgba(26, 26, 26, .122) inset, 0rem 0.125rem 0.0625rem 0rem rgba(26, 26, 26, .2) inset;
+}
+@layer components {
+    .btn-hover, .btn-m{
+        @apply cursor-pointer active:scale-95 active:opacity-70 transition-all duration-300 outline-none focus:outline-none;
+    }
+    .btn-shadow{
+        box-shadow: var(--p-shadow-button)!important;
+        &:active{
+            @apply hover:text-opacity-100  ;
+            box-shadow: var(--p-shadow-button-inset);
+        }
+    }
+    .btn {
+        @apply inline-flex items-center rounded-lg text-xs font-semibold hover:text-opacity-70 w-fit h-8 px-2.5 t-3 select-none;
+       
+    }
+    .btn-header {
+        // --p-shadow-button: 0rem -0.0625rem 0rem 0.0625rem rgba(0, 0, 0, 0.354) inset, 0rem 0rem 0rem 0.0625rem #303030 inset, 0rem 0.03125rem 0rem 0.09375rem hsla(0, 0%, 100%, 0.158) inset;
+        @apply inline-flex items-center justify-center rounded-lg bg-gradient-to-b from-[#0e1e23] to-[#192828] text-white shadow-inner p-1 min-w-8 h-8 border-t border-l border-white/10;
+        &:active{
+            @apply hover:text-opacity-100  ;
+            box-shadow: var(--p-shadow-button-inset);
+        }
+    }
+  
+    span:disabled, ul:disabled,li:disabled,p:disabled,svg:disabled, div:disabled, .disabled, a.disabled, button:disabled{
+        @apply ring-gray-200 bg-gray-200 bg-none pointer-events-none opacity-90 text-gray-500 shadow-none border-none ;
+    }
+    .btn-primary {
+        --p-shadow-button: 0rem -0.0625rem 0rem 0.0625rem #107c5d inset, 0rem 0rem 0rem 0.0625rem #2f9376 inset, 0rem 0.03125rem 0rem 0.09375rem hsla(0, 0%, 100%, .25) inset;
+        @apply bg-gradient-to-b from-primary to-green-500 text-white btn-shadow
+    }
+    .btn-success {
+        --p-shadow-button: 0rem -0.0625rem 0rem 0rem #16a34a inset, 0rem 0rem 0rem 0.0625rem rgba(0, 0, 0, .1) inset, 0rem 0.03125rem 0rem 0.09375rem #ffffff5a inset;
+        @apply bg-gradient-to-b from-green-600 to-green-400 text-white btn-shadow
+    }
+    .btn-warning {
+        --p-shadow-button: 0rem -0.0625rem 0rem 0rem #c29e0e inset, 0rem 0rem 0rem 0.0625rem #c9ad3d inset, 0rem 0.03125rem 0rem 0.09375rem #ffffffa8 inset;
+        @apply bg-gradient-to-b from-yellow-500 to-yellow-300 text-dark btn-shadow
+    }
+    .btn-info {
+        --p-shadow-button: 0rem -0.0625rem 0rem 0rem #0549bb inset, 0rem 0rem 0rem 0.0625rem rgb(60 130 246) inset, 0rem 1px 0rem 0.09375rem #ffffff47 inset;
+        @apply bg-gradient-to-b from-blue-600 to-blue-500 text-white btn-shadow
+    }
+    .btn-secondary {
+        --p-shadow-button: 0rem -0.0625rem 0rem 0rem #b5b5b5 inset, 0rem 0rem 0rem 0.0625rem rgba(0, 0, 0, .1) inset, 0rem 0.03125rem 0rem 0.09375rem #fff inset;
+        @apply bg-gradient-to-b from-gray-200 to-gray-100 text-dark btn-shadow;
+    }
+    .btn-danger {
+        --p-shadow-button: 0rem -0.0625rem 0rem 0.0625rem #ef4444 inset, 0rem 0rem 0rem 0.0625rem #b5260bcc inset, 0rem 0.03125rem 0rem 0.09375rem #ffffff5a inset;
+        @apply bg-gradient-to-b from-red-500 to-red-400 text-white btn-shadow
+    }
+    .btn-orange {
+        --p-shadow-button: 0rem -0.0625rem 0rem 0.0625rem #ea580c inset, 0rem 0rem 0rem 0.0625rem #bb4f07e6 inset, 0rem 0.03125rem 0rem 0.09375rem #ffffff5a inset;
+        @apply bg-gradient-to-b from-orange-600 to-orange-400 text-white btn-shadow
+    }
+    .btn-indigo {
+        --p-shadow-button: 0rem -0.0625rem 0rem 0.0625rem #4f46e5 inset, 0rem 0rem 0rem 0.0625rem #170fa5ba inset, 0rem 0.03125rem 0rem 0.09375rem #ffffff5a inset;
+        @apply bg-gradient-to-b from-indigo-600 to-indigo-400 text-white btn-shadow
+    }
+    .btn-dark{
+        --p-shadow-button: 0rem -0.0625rem 0rem 0.0625rem rgba(0, 0, 0, .8) inset, 0rem 0rem 0rem 0.0625rem #303030 inset, 0rem 0.03125rem 0rem 0.09375rem hsla(0, 0%, 100%, .25) inset;
+        @apply bg-dark text-white btn-shadow
+    }
+    .btn.btn-link {
+        @apply hover:text-blue-700 hover:underline text-blue-500 bg-transparent shadow-none border-none ring-transparent px-1 h-fit;
+        background-image: none;
+    }
+    .btn.btn-link.btn-primary {
+        @apply hover:text-green-700 text-primary 
+    }
+    .btn.btn-link.btn-success {
+        @apply hover:text-green-700 text-green-500 
+    }
+    .btn.btn-link.btn-info {
+        @apply hover:text-blue-700 text-blue-500 
+    }
+    .btn.btn-link.btn-danger {
+        @apply hover:text-red-700 text-red-500
+    }
+    .btn.btn-link.btn-dark {
+        @apply hover:text-slate-900 text-dark
+    }
+
+    .page-actions {
+        @apply flex gap-2 py-2 text-xs sticky bottom-0 backdrop-blur-xl bg-white/30 z-900 shadow px-3;
+        &.actions-mobile{
+            @screen md{
+                @apply mx-auto w-full bottom-5 p-2 rounded-lg ring-1 ring-gray-200;
+            } 
+        }
+        .btn{
+            @apply h-10;
+        }
+    }
+    
+}

@@ -1,0 +1,1 @@
+import{i as f}from"./focus-management-MNOb7v6P.js";import{ai as d}from"./useAlert-CtgIy88N.js";function s({container:e,accept:r,walk:o,enabled:t}){d(()=>{let a=e.value;if(!a||t!==void 0&&!t.value)return;let i=f(e);if(!i)return;let l=Object.assign(n=>r(n),{acceptNode:r}),c=i.createTreeWalker(a,NodeFilter.SHOW_ELEMENT,l,!1);for(;c.nextNode();)o(c.currentNode)})}export{s as i};

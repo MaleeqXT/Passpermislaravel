@@ -1,0 +1,27 @@
+@use './common';
+@use "./custom-scrollbar";
+@use './transition';
+@use './forms';
+@use './table';
+@use './button';
+@use './scrollbar';
+@use './editor-content';
+@use './date-picker';
+@use './slider';
+@use './status';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+.box {
+    --p-shadow-100: 0rem 0.0625rem 0rem 0rem rgba(92, 92, 92, 0.191);
+    --p-shadow-bevel-100: 0.0625rem 0rem 0rem 0rem #6d6d6d21 inset,-0.0625rem 0rem 0rem 0rem #6d6d6d21 inset,0rem -0.0625rem 0rem 0rem #6d6d6d21 inset,0rem 0.0625rem 0rem 0rem #cccccc56 inset;
+    position: relative;
+    box-shadow: var(--p-shadow-100);
+    @apply rounded-lg;
+    &::before{
+        content: "";
+        @apply rounded-lg absolute inset-0 z-1 pointer-events-none;
+        box-shadow: var(--p-shadow-bevel-100);
+    }
+}

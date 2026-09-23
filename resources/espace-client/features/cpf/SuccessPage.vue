@@ -1,0 +1,25 @@
+<script setup lang="ts">
+import {Head} from '@inertiajs/vue3';
+
+const props = defineProps(['info'])
+</script>
+
+<template>
+    <Head title="Test de positionnement en ligne CPF PPF"/>
+    <main class="h-screen flex-center flex-col w-full bg-gradient-to-b from-primary to-[#01161d] px-2">
+        <div class="fixed z-0 inset-0 opacity-70 pointer-events-none">
+            <img src="/assets/bg.svg" class="object-cover w-full h-full"/>
+        </div>
+
+        <section
+            class="sm:max-w-[700px] max-h-[99%] w-full mx-auto bg-white flex max-md:flex-col p-5 md:p-3 shadow-box rounded-xl gap-4 relative ">
+
+            <article class="flex-1 p-10 scrollbar overflow-y-auto w-full ">
+
+                    <span class="text-center text-sm font-bold">Le secrétariat vous contactera prochainement pour confirmer et réserver les horaires. Merci pour votre compréhension.</span>
+
+
+            </article>
+        </section>
+    </main>
+</template>

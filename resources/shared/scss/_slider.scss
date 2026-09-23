@@ -1,0 +1,24 @@
+@layer components {
+    .slider-container {
+        @apply flex overflow-x-scroll no-scrollbar snap-x snap-mandatory;
+    }
+ 
+    @media not all and (min-width: 768px) {
+        .slider-mobile {
+            @apply flex overflow-x-scroll no-scrollbar snap-x snap-mandatory;
+        }
+    } 
+    .slider-item {
+        @apply shrink-0 snap-start max-md:w-[90%];
+    
+        &:first-child {
+            @apply max-md:snap-end;
+        }
+        &:last-child {
+            @apply snap-start;
+        }
+    }
+
+
+    
+}

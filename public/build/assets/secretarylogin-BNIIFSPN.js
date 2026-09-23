@@ -1,0 +1,1 @@
+import{P as e}from"./index-0kJrayW_.js";import{a as r,t as s,o as t,f as o,m as n,x as p,e as l}from"./useAlert-Dl0GyuCe.js";const u=r({__name:"secretarylogin",props:{ahmar:{}},setup(c){return(a,i)=>(t(),s(l(e),{padding:"none",width:"full",class:"pb-20"},{default:o(()=>[n("h1",null,p(a.ahmar),1)]),_:1}))}});export{u as default};

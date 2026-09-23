@@ -1,0 +1,1 @@
+import{a as e,c as t,o}from"./useAlert-CtgIy88N.js";const n={class:"bg-white rounded-[30px] p-4 md:p-9"},r=e({__name:"ClientItem",props:{item:{type:Object,default:()=>({})}},setup(p){return(s,a)=>(o(),t("li",n))}});export{r as default};

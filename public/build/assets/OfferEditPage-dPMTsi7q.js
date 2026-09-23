@@ -1,0 +1,1 @@
+import{P as o}from"./index-0kJrayW_.js";import{O as r}from"./index-USddZ1Ae.js";import{a as t,t as f,o as s,f as n,b as p,e}from"./useAlert-Dl0GyuCe.js";const u=t({__name:"OfferEditPage",props:{offer:{}},setup(d){return(a,i)=>(s(),f(e(o),{width:"full",padding:"none"},{default:n(()=>[p(e(r),{data:a.offer,"is-edit":""},null,8,["data"])]),_:1}))}});export{u as default};

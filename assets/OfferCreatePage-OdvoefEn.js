@@ -1,0 +1,1 @@
+import{P as a}from"./index-BE9dxwBt.js";import{O as r}from"./index-C0gwuI2P.js";import{a as o,q as t,o as f,f as n,b as s,e}from"./useAlert-CtgIy88N.js";const u=o({__name:"OfferCreatePage",setup(m){return(p,c)=>(f(),t(e(a),{width:"full",padding:"none"},{default:n(()=>[s(e(r))]),_:1}))}});export{u as default};

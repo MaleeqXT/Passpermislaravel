@@ -1,0 +1,1 @@
+var e=(s=>(s[s.SUCCESS=1]="SUCCESS",s[s.FAILED=2]="FAILED",s[s.PENDING=3]="PENDING",s))(e||{});const a={1:{id:1,name:"Réussi",class:"success"},2:{id:2,name:"Echoué",class:"danger"},3:{id:3,name:"En attente",class:"default"}},c={1:{id:1,name:"Refus",class:"danger"},2:{id:2,name:"Admis",class:"success"}};export{a as E,e as a,c as b};

@@ -1,0 +1,1 @@
+import{R as r,r as a,w as s}from"./useAlert-Dl0GyuCe.js";const e="SIDEBAR_STORE",c=r("Sidebar",()=>{const t=a(!!localStorage.getItem(e));return s(t,o=>{o?localStorage.setItem(e,String(o)):localStorage.removeItem(e)}),{isCollapsed:t}});export{c as u};

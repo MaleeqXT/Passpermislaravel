@@ -1,0 +1,1 @@
+import{a,q as s,o,f as t,m as l,e as c,P as r}from"./useAlert-CtgIy88N.js";const p=["src"],i=a({__name:"Logo",props:{black:{type:Boolean}},setup(n){return(e,f)=>(o(),s(c(r),{href:"/"},{default:t(()=>[l("img",{src:(e.black,"/assets/logo-permis-facile.webp"),alt:"ecole",class:"w-full max-h-16 mx-auto"},null,8,p)]),_:1}))}});export{i as default};

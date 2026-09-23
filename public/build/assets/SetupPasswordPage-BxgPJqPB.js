@@ -1,0 +1,1 @@
+import{a as o,c as n,o as s,b as a,e as t,a6 as r,F as m}from"./useAlert-Dl0GyuCe.js";import{F as l}from"./index-_dfO7cyu.js";const f=o({__name:"SetupPasswordPage",props:{email:Object,token:String},setup(e){return(i,c)=>(s(),n(m,null,[a(t(r),{title:"Difinir le mot de passe"}),a(t(l),{email:e.email,token:e.token},null,8,["email","token"])],64))}});export{f as default};

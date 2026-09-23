@@ -1,0 +1,13 @@
+@layer components {
+    .cell{
+        @apply whitespace-nowrap px-2 py-px min-w-32  text-sm font-medium text-gray-900 border-gray-100 border border-l first:border-x-0 last:border-r-0 h-9;
+        &:nth-child(2){
+            @apply border-l-0;
+        }
+    }
+    
+    .table-actions {
+        @apply fixed bottom-14 min-w-80  z-50 bg-dark p-3 shadow-xl rounded-xl border flex gap-2 h-fit;
+        transform: translateX(calc(-50% + 7.5rem));
+    }
+}

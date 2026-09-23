@@ -1,0 +1,57 @@
+
+@layer components {
+
+   .status{
+        &-primary{
+            @apply  text-primary border border-primary/20;
+        }
+        &-info{
+            @apply bg-blue-500 text-blue-100 border border-blue-600;
+        }
+        &-success{
+            @apply bg-green-500 text-green-100 border border-green-600/70;
+        }
+        &-alert{
+            @apply bg-orange-500 text-orange-100 border border-orange-600;
+        }
+        &-warning{
+            @apply bg-yellow-500 text-dark border border-yellow-600;
+        }
+        &-danger{
+            @apply bg-red-500 text-rose-100 border border-red-600;
+        }
+        &-dark{
+            @apply bg-dark text-white border border-dark;
+        }
+        &-default, &-secondary{
+            @apply bg-gray-200 text-gray-600 border border-gray-300;
+        }
+   }
+   .tab {
+        &-primary{
+            @apply  bg-primary bordertext-white ;
+        }
+        &-info{
+            @apply  bg-blue-600 text-white;
+        }
+        &-success{
+            @apply  bg-green-500 text-white;
+        }
+        &-alert{
+            @apply  bg-orange-500 text-white;
+        }
+        &-warning{
+            @apply  bg-yellow-500 text-dark;
+        }
+        &-danger{
+            @apply  bg-rose-500 text-white;
+        }
+        &-dark{
+            @apply bg-dark text-white; 
+        }
+        &-default, &-secondary{
+            @apply  bg-gray-600 text-white;
+        }
+   } 
+    
+}

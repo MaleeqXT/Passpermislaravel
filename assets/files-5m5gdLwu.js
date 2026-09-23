@@ -1,0 +1,1 @@
+const i={all:["image/png","image/webp","image/jpeg","image/jpg","application/pdf","application/doc","application/docx"],docs:["application/pdf","application/doc","application/docx"],images:["image/png","image/jpeg","image/jpg","image/webp"],videos:["video/mp4","video/webm","video/ogg"],audios:["audio/mpeg","audio/ogg","audio/wav"]};export{i as f};

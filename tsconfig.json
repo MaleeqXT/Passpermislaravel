@@ -1,0 +1,42 @@
+{
+    "allowJs": true,
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "Node",
+        "strict": true,
+        "jsx": "preserve",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "checkJs": false, // Don't type-check JavaScript files
+        "baseUrl": ".",
+        "paths": {
+            "@espace-admin/*": ["resources/espace-admin/*"],
+            "@espace-monitor/*": ["resources/espace-monitor/*"],
+            "@espace-student/*": ["resources/espace-student/*"],
+            "@espace-client/*": ["resources/espace-client/*"],
+            "@common/*": ["resources/common/*"],
+            "@shared/*": ["resources/shared/*"],
+            "@assets/*": ["resources/assets/*"],
+            "@/*": ["resources/*"]
+        },
+        "types": ["vite/client"]
+    },
+    "include": ["resources/**/*.ts", "resources/**/*.d.ts", "resources/**/*.vue", "resources/**/*.js"],
+    "exclude": [
+        "node_modules",
+        "vendor",
+        "app",
+        "bootstrap",
+        "config",
+        "database",
+        "front",
+        "lang",
+        "public",
+        "routes",
+        "tests",
+        "storage",
+        "dist"
+    ]
+}
