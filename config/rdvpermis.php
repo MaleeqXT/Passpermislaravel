@@ -23,5 +23,6 @@ return [
         'RDVPERMIS_SCOPES',
         'rdvpermis livret_numerique:read livret_numerique:write offline_access'
     )))),
+    'state_ttl_minutes' => (int) env('RDVPERMIS_STATE_TTL_MINUTES', 10),
     'timeout' => (int) env('RDVPERMIS_TIMEOUT', 20),
 ];

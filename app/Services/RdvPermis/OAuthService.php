@@ -3,14 +3,14 @@
 namespace App\Services\RdvPermis;
 
 use App\Exceptions\RdvPermisOAuthException;
+use App\Models\RdvPermisOAuthState;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class OAuthService
 {
@@ -20,8 +20,24 @@ class OAuthService
     {
         $this->requireConfiguration(['authorization_url', 'client_id', 'redirect_uri']);
 
-        $state = Str::random(64);
-        Cache::put($this->stateKey($state), $user->getKey(), now()->addMinutes(10));
+        // This is intentionally database-backed instead of session/cache-backed:
+        // the browser callback does not carry the Sanctum bearer token and can
+        // be handled by a different web worker than the connect request.
+        $state = bin2hex(random_bytes(32));
+        $expiresAt = now()->addMinutes($this->stateTtlMinutes());
+
+        RdvPermisOAuthState::query()->create([
+            'user_id' => $user->getKey(),
+            'state_hash' => $this->stateHash($state),
+            'expires_at' => $expiresAt,
+        ]);
+
+        Log::info('RdvPermis OAuth state stored', [
+            'storage' => 'database',
+            'user_id' => $user->getKey(),
+            'state_length' => strlen($state),
+            'expires_at' => $expiresAt->toIso8601String(),
+        ]);
 
         return config('rdvpermis.authorization_url').(str_contains(config('rdvpermis.authorization_url'), '?') ? '&' : '?')
             .http_build_query([
@@ -38,6 +54,12 @@ class OAuthService
         try {
             $this->requireConfiguration(['token_url', 'client_id', 'client_secret', 'redirect_uri']);
         } catch (RuntimeException $exception) {
+            Log::warning('RdvPermis OAuth token exchange configuration failed', [
+                'stage' => 'token_exchange',
+                'exception' => $exception::class,
+                'exception_message' => $this->safeExceptionMessage($exception),
+            ]);
+
             throw new RdvPermisOAuthException('token_exchange', $exception->getMessage());
         }
 
@@ -46,6 +68,11 @@ class OAuthService
         }
 
         $user = $this->consumeState($state);
+
+        Log::info('RdvPermis OAuth token exchange starting', [
+            'stage' => 'token_exchange',
+            'user_id' => $user->getKey(),
+        ]);
 
         try {
             $response = Http::asForm()->timeout(config('rdvpermis.timeout'))
@@ -60,10 +87,17 @@ class OAuthService
             Log::warning('RdvPermis OAuth connection failure', [
                 'stage' => 'token_exchange',
                 'exception' => $exception::class,
+                'exception_message' => $this->safeExceptionMessage($exception),
             ]);
 
             throw new RdvPermisOAuthException('token_exchange', 'Le service RdvPermis est temporairement inaccessible. Réessayez plus tard.');
         }
+
+        Log::info('RdvPermis OAuth token exchange response received', [
+            'stage' => 'token_exchange',
+            'http_status' => $response->status(),
+            'has_access_token' => filled($response->json('access_token')),
+        ]);
 
         if (! $response->successful() || ! filled($response->json('access_token'))) {
             Log::warning('RdvPermis OAuth token exchange rejected', [
@@ -75,13 +109,30 @@ class OAuthService
             throw new RdvPermisOAuthException('token_exchange', 'La connexion Livret Numérique n’a pas pu être finalisée.');
         }
 
+        Log::info('RdvPermis OAuth token exchange completed', [
+            'stage' => 'token_exchange',
+            'http_status' => $response->status(),
+            'user_id' => $user->getKey(),
+        ]);
+
         try {
+            Log::info('RdvPermis OAuth token persistence starting', [
+                'stage' => 'token_persistence',
+                'user_id' => $user->getKey(),
+            ]);
+
             $this->tokens->store($user, $response->json());
-        } catch (\Throwable $exception) {
+
+            Log::info('RdvPermis OAuth token persistence completed', [
+                'stage' => 'token_persistence',
+                'user_id' => $user->getKey(),
+            ]);
+        } catch (Throwable $exception) {
             Log::error('RdvPermis OAuth token persistence failed', [
                 'stage' => 'token_persistence',
                 'user_id' => $user->getKey(),
                 'exception' => $exception::class,
+                'exception_message' => $this->safeExceptionMessage($exception),
             ]);
 
             throw new RdvPermisOAuthException('token_persistence', 'La connexion Livret Numérique n’a pas pu être enregistrée.');
@@ -95,21 +146,81 @@ class OAuthService
      */
     public function consumeState(string $state): User
     {
+        Log::info('RdvPermis OAuth state validation starting', [
+            'stage' => 'state_validation',
+            'storage' => 'database',
+            'state_present' => $state !== '',
+            'state_length' => strlen($state),
+        ]);
+
         if ($state === '') {
+            $this->logStateFailure($state, false, false, false);
+
             throw new RdvPermisOAuthException('state_validation', 'La demande de connexion a expiré. Veuillez recommencer.');
         }
 
-        $userId = Cache::pull($this->stateKey($state));
-        if (! $userId) {
+        $stateHash = $this->stateHash($state);
+        $oauthState = RdvPermisOAuthState::query()
+            ->where('state_hash', $stateHash)
+            ->first();
+
+        if ($oauthState === null || ! hash_equals($oauthState->state_hash, $stateHash)) {
+            $this->logStateFailure($state, false, false, false);
+
+            throw new RdvPermisOAuthException('state_validation', 'La demande de connexion a expiré. Veuillez recommencer.');
+        }
+
+        if ($oauthState->expires_at->isPast()) {
+            $this->logStateFailure($state, true, true, $oauthState->consumed_at !== null, $oauthState->user_id);
+
+            throw new RdvPermisOAuthException('state_validation', 'La demande de connexion a expiré. Veuillez recommencer.');
+        }
+
+        // The conditional update makes the state single-use even when the
+        // provider/browser retries the callback concurrently.
+        $consumed = RdvPermisOAuthState::query()
+            ->whereKey($oauthState->getKey())
+            ->whereNull('consumed_at')
+            ->where('expires_at', '>', now())
+            ->update(['consumed_at' => now()]);
+
+        if ($consumed !== 1) {
+            $oauthState->refresh();
+            $this->logStateFailure(
+                $state,
+                true,
+                $oauthState->expires_at->isPast(),
+                $oauthState->consumed_at !== null,
+                $oauthState->user_id,
+            );
+
             throw new RdvPermisOAuthException('state_validation', 'La demande de connexion a expiré. Veuillez recommencer.');
         }
 
         try {
-            return User::query()->findOrFail($userId);
-        } catch (\Throwable $exception) {
+            $user = User::query()
+                ->without(['monitor', 'student', 'secretary'])
+                ->findOrFail($oauthState->user_id);
+
+            Log::info('RdvPermis OAuth state validation completed', [
+                'stage' => 'state_validation',
+                'storage' => 'database',
+                'user_id' => $user->getKey(),
+            ]);
+
+            return $user;
+        } catch (Throwable $exception) {
             Log::warning('RdvPermis OAuth state user lookup failed', [
                 'stage' => 'state_validation',
+                'storage' => 'database',
+                'state_present' => true,
+                'state_length' => strlen($state),
+                'state_record_found' => true,
+                'state_expired' => false,
+                'state_already_consumed' => false,
+                'user_id' => $oauthState->user_id,
                 'exception' => $exception::class,
+                'exception_message' => $this->safeExceptionMessage($exception),
             ]);
 
             throw new RdvPermisOAuthException('state_validation', 'La demande de connexion a expiré. Veuillez recommencer.');
@@ -142,9 +253,45 @@ class OAuthService
         }
     }
 
-    private function stateKey(string $state): string
+    private function stateHash(string $state): string
     {
-        return "rdvpermis:oauth-state:$state";
+        return hash('sha256', $state);
+    }
+
+    private function stateTtlMinutes(): int
+    {
+        return max(1, (int) config('rdvpermis.state_ttl_minutes', 10));
+    }
+
+    private function logStateFailure(
+        string $state,
+        bool $recordFound,
+        bool $expired,
+        bool $alreadyConsumed,
+        int|string|null $userId = null,
+    ): void {
+        Log::warning('RdvPermis OAuth state validation failed', [
+            'stage' => 'state_validation',
+            'storage' => 'database',
+            'state_present' => $state !== '',
+            'state_length' => strlen($state),
+            'state_record_found' => $recordFound,
+            'state_expired' => $expired,
+            'state_already_consumed' => $alreadyConsumed,
+            'user_id' => $userId,
+        ]);
+    }
+
+    private function safeExceptionMessage(Throwable $exception): string
+    {
+        $message = preg_replace('/[\r\n]+/', ' ', $exception->getMessage()) ?? '';
+        $message = preg_replace(
+            '/\b(access_token|refresh_token|client_secret|code|state)\s*[:=]\s*[^\s&]+/i',
+            '$1=[redacted]',
+            $message,
+        ) ?? '';
+
+        return mb_substr($message, 0, 300);
     }
 
     private function safeProviderError(Response $response): ?string
