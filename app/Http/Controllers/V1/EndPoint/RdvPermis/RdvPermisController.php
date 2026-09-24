@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\V1\EndPoint\RdvPermis;
 
 use App\Exceptions\RdvPermisApiException;
+use App\Exceptions\RdvPermisOAuthException;
 use App\Http\Controllers\Controller;
 use App\Services\RdvPermis\AutoEcoleService;
 use App\Services\RdvPermis\OAuthService;
@@ -10,6 +11,7 @@ use App\Services\RdvPermis\TokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -34,6 +36,13 @@ class RdvPermisController extends Controller
 
     public function connect(Request $request, OAuthService $oauth): JsonResponse
     {
+        if ($this->missingConfiguration() !== []) {
+            return response()->json([
+                'message' => 'La configuration RdvPermis est incomplète.',
+                'missing_configuration' => $this->missingConfiguration(),
+            ], 503);
+        }
+
         try {
             return response()->json(['data' => ['authorization_url' => $oauth->authorizationUrl($request->user())]]);
         } catch (RuntimeException $exception) {
@@ -41,26 +50,47 @@ class RdvPermisController extends Controller
         }
     }
 
-    public function callback(Request $request, OAuthService $oauth): RedirectResponse
+    public function callback(Request $request, OAuthService $oauth): RedirectResponse|JsonResponse
     {
         if ($request->filled('error')) {
+            Log::warning('RdvPermis OAuth authorization callback rejected', [
+                'stage' => 'authorization_callback',
+                'provider_error' => $this->safeProviderError($request),
+            ]);
+
             try {
                 $oauth->consumeState($request->string('state')->toString());
             } catch (Throwable $exception) {
-                report($exception);
+                Log::warning('RdvPermis OAuth rejected callback state could not be consumed', [
+                    'stage' => $exception instanceof RdvPermisOAuthException ? $exception->stage : 'state_validation',
+                    'exception' => $exception::class,
+                ]);
             }
 
-            return redirect()->away($this->frontendCallback('error'));
+            return $this->redirectToFrontend('error');
         }
 
         try {
-            $oauth->exchangeAuthorizationCode($request->string('code')->toString(), $request->string('state')->toString());
+            $oauth->exchangeAuthorizationCode(
+                $request->string('code')->toString(),
+                $request->string('state')->toString(),
+            );
 
-            return redirect()->away($this->frontendCallback('connected'));
+            return $this->redirectToFrontend('connected');
+        } catch (RdvPermisOAuthException $exception) {
+            Log::warning('RdvPermis OAuth callback failed', [
+                'stage' => $exception->stage,
+                'exception' => $exception::class,
+            ]);
+
+            return $this->redirectToFrontend('error');
         } catch (Throwable $exception) {
-            report($exception);
+            Log::error('RdvPermis OAuth callback failed unexpectedly', [
+                'stage' => 'authorization_callback',
+                'exception' => $exception::class,
+            ]);
 
-            return redirect()->away($this->frontendCallback('error'));
+            return $this->redirectToFrontend('error');
         }
     }
 
@@ -94,10 +124,45 @@ class RdvPermisController extends Controller
     {
         $url = config('rdvpermis.frontend_callback_url');
         if (! filled($url)) {
-            abort(503, 'RDVPERMIS_FRONTEND_CALLBACK_URL is not configured.');
+            throw new RdvPermisOAuthException('frontend_redirect', 'RDVPERMIS_FRONTEND_CALLBACK_URL is not configured.');
         }
 
         return $url.(str_contains($url, '?') ? '&' : '?').'rdvpermis='.$result;
+    }
+
+    private function redirectToFrontend(string $result): RedirectResponse|JsonResponse
+    {
+        try {
+            return redirect()->away($this->frontendCallback($result));
+        } catch (RdvPermisOAuthException $exception) {
+            Log::error('RdvPermis OAuth frontend redirect failed', [
+                'stage' => $exception->stage,
+                'exception' => $exception::class,
+            ]);
+
+            return response()->json([
+                'message' => 'La redirection de fin de connexion RdvPermis est indisponible.',
+                'stage' => $exception->stage,
+            ], 503);
+        }
+    }
+
+    private function safeProviderError(Request $request): ?string
+    {
+        $error = $request->input('error_description') ?? $request->input('error');
+
+        if (! is_string($error) || $error === '') {
+            return null;
+        }
+
+        $sanitized = preg_replace('/[\r\n]+/', ' ', $error) ?? '';
+        $sanitized = preg_replace(
+            '/\b(access_token|refresh_token|client_secret|code)\s*[:=]\s*[^\s&]+/i',
+            '$1=[redacted]',
+            $sanitized,
+        ) ?? '';
+
+        return mb_substr($sanitized, 0, 300);
     }
 
     private function missingConfiguration(): array

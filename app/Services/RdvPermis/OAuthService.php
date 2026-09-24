@@ -2,8 +2,10 @@
 
 namespace App\Services\RdvPermis;
 
+use App\Exceptions\RdvPermisOAuthException;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -33,9 +35,14 @@ class OAuthService
 
     public function exchangeAuthorizationCode(string $code, string $state): User
     {
-        $this->requireConfiguration(['token_url', 'client_id', 'client_secret', 'redirect_uri']);
+        try {
+            $this->requireConfiguration(['token_url', 'client_id', 'client_secret', 'redirect_uri']);
+        } catch (RuntimeException $exception) {
+            throw new RdvPermisOAuthException('token_exchange', $exception->getMessage());
+        }
+
         if ($code === '') {
-            throw new RuntimeException('Le code d’autorisation RdvPermis est manquant.');
+            throw new RdvPermisOAuthException('authorization_callback', 'Le code d’autorisation RdvPermis est manquant.');
         }
 
         $user = $this->consumeState($state);
@@ -51,18 +58,34 @@ class OAuthService
                 ]);
         } catch (ConnectionException $exception) {
             Log::warning('RdvPermis OAuth connection failure', [
+                'stage' => 'token_exchange',
                 'exception' => $exception::class,
             ]);
 
-            throw new RuntimeException('Le service RdvPermis est temporairement inaccessible. Réessayez plus tard.');
+            throw new RdvPermisOAuthException('token_exchange', 'Le service RdvPermis est temporairement inaccessible. Réessayez plus tard.');
         }
 
         if (! $response->successful() || ! filled($response->json('access_token'))) {
-            report(new RuntimeException('Échec de l’échange OAuth RdvPermis : HTTP '.$response->status()));
-            throw new RuntimeException('La connexion Livret Numérique n’a pas pu être finalisée.');
+            Log::warning('RdvPermis OAuth token exchange rejected', [
+                'stage' => 'token_exchange',
+                'http_status' => $response->status(),
+                'provider_error' => $this->safeProviderError($response),
+            ]);
+
+            throw new RdvPermisOAuthException('token_exchange', 'La connexion Livret Numérique n’a pas pu être finalisée.');
         }
 
-        $this->tokens->store($user, $response->json());
+        try {
+            $this->tokens->store($user, $response->json());
+        } catch (\Throwable $exception) {
+            Log::error('RdvPermis OAuth token persistence failed', [
+                'stage' => 'token_persistence',
+                'user_id' => $user->getKey(),
+                'exception' => $exception::class,
+            ]);
+
+            throw new RdvPermisOAuthException('token_persistence', 'La connexion Livret Numérique n’a pas pu être enregistrée.');
+        }
 
         return $user;
     }
@@ -73,15 +96,24 @@ class OAuthService
     public function consumeState(string $state): User
     {
         if ($state === '') {
-            throw new RuntimeException('La demande de connexion a expiré. Veuillez recommencer.');
+            throw new RdvPermisOAuthException('state_validation', 'La demande de connexion a expiré. Veuillez recommencer.');
         }
 
         $userId = Cache::pull($this->stateKey($state));
         if (! $userId) {
-            throw new RuntimeException('La demande de connexion a expiré. Veuillez recommencer.');
+            throw new RdvPermisOAuthException('state_validation', 'La demande de connexion a expiré. Veuillez recommencer.');
         }
 
-        return User::query()->findOrFail($userId);
+        try {
+            return User::query()->findOrFail($userId);
+        } catch (\Throwable $exception) {
+            Log::warning('RdvPermis OAuth state user lookup failed', [
+                'stage' => 'state_validation',
+                'exception' => $exception::class,
+            ]);
+
+            throw new RdvPermisOAuthException('state_validation', 'La demande de connexion a expiré. Veuillez recommencer.');
+        }
     }
 
     private function requireConfiguration(array $keys): void
@@ -113,5 +145,23 @@ class OAuthService
     private function stateKey(string $state): string
     {
         return "rdvpermis:oauth-state:$state";
+    }
+
+    private function safeProviderError(Response $response): ?string
+    {
+        $error = $response->json('error_description') ?? $response->json('error') ?? $response->json('message');
+
+        if (! is_string($error) || $error === '') {
+            return null;
+        }
+
+        $sanitized = preg_replace('/[\r\n]+/', ' ', $error) ?? '';
+        $sanitized = preg_replace(
+            '/\b(access_token|refresh_token|client_secret|code)\s*[:=]\s*[^\s&]+/i',
+            '$1=[redacted]',
+            $sanitized,
+        ) ?? '';
+
+        return mb_substr($sanitized, 0, 300);
     }
 }
