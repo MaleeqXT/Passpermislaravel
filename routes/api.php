@@ -3,9 +3,14 @@
 require __DIR__.'/chat.php';
 
 use App\Http\Controllers\Backend\Front\ContactController;
-use App\Http\Controllers\Backend\Front\StudentsController;
 use App\Http\Controllers\Backend\Front\Offers\OffersController;
+use App\Http\Controllers\Backend\Front\StudentsController;
 use App\Http\Controllers\ReservationCommentController;
+use App\Http\Controllers\V1\EndPoint\RdvPermis\CandidateMandateController;
+use App\Http\Controllers\V1\EndPoint\RdvPermis\CentreController;
+use App\Http\Controllers\V1\EndPoint\RdvPermis\ExamController;
+use App\Http\Controllers\V1\EndPoint\RdvPermis\PanierController;
+use App\Http\Controllers\V1\EndPoint\RdvPermis\PlanningController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\RdvPermisController;
 use App\Http\Controllers\V1\EndPoint\Student\Info\StudentStatsController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\CartController;
@@ -96,6 +101,34 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary'])->prefix(
     Route::post('/connect', [RdvPermisController::class, 'connect'])->name('connect');
     Route::get('/current-school', [RdvPermisController::class, 'currentSchool'])->name('current-school');
     Route::get('/employees', [RdvPermisController::class, 'employees'])->name('employees');
+    Route::post('/planning/recherche', [PlanningController::class, 'search'])->name('planning.search');
+    Route::post('/candidats-mandats/recherche', [CandidateMandateController::class, 'search'])->name('candidates-mandates.search');
+    Route::post('/centres/recherche', [CentreController::class, 'search'])->name('centres.search');
+    Route::get('/centres-favoris', [CentreController::class, 'favorites'])->name('centres-favoris.index');
+    Route::post('/centres-favoris', [CentreController::class, 'saveFavorites'])->name('centres-favoris.store');
+    Route::get('/centres/{centreId}', [CentreController::class, 'show'])->name('centres.show');
+    Route::prefix('examens')->name('examens.')->controller(ExamController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/remplacement', 'replace')->name('replace');
+        Route::post('/permutation', 'permute')->name('permute');
+        Route::get('/permutables', 'permutables')->name('permutables');
+        Route::get('/nombre-de-remplacement', 'replacementAllowance')->name('replacement-allowance');
+        Route::get('/dates', 'dates')->name('dates');
+        Route::get('/pagines', 'paginated')->name('paginated');
+        Route::get('/{examenId}', 'show')->name('show');
+        Route::delete('/{examenId}', 'destroy')->name('destroy');
+    });
+    Route::prefix('paniers')->name('paniers.')->controller(PanierController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::post('/{panierId}/creneaux', 'addSlot')->name('slots.store');
+        Route::post('/{panierId}/creneaux-multiples', 'addSlots')->name('slots.store-many');
+        Route::delete('/{panierId}/creneaux/{creneauId}', 'removeSlot')->name('slots.destroy');
+        Route::put('/{panierId}/creneaux/{creneauId}/candidat', 'assignCandidate')->name('slots.candidate');
+        Route::get('/{panierId}', 'show')->name('show');
+        Route::delete('/{panierId}', 'destroy')->name('destroy');
+        Route::post('/{panierId}/valider', 'validatePanier')->name('validate');
+    });
 });
 
 Route::prefix('pages')->name('pages.')

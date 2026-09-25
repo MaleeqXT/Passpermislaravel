@@ -5,15 +5,16 @@ namespace Tests\Feature;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\RdvPermisSyncRecord;
 use App\Models\RdvPermisToken;
-use App\Models\Roles\Student\User\Student;
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -34,6 +35,7 @@ class RdvPermisStudentMandateTest extends TestCase
         ]);
         DB::purge('rdvpermis_mandate_test');
         DB::setDefaultConnection('rdvpermis_mandate_test');
+        config()->set('session.driver', 'array');
         config()->set('rdvpermis.api_url', 'https://api.example.test');
         config()->set('rdvpermis.timeout', 2);
         Http::preventStrayRequests();
@@ -95,11 +97,11 @@ class RdvPermisStudentMandateTest extends TestCase
             'id' => 'mandate-123',
             'candidatId' => 'candidate-456',
             'autoEcole' => 'school-789',
-            'groupePermis' => 'A',
+            'groupePermis' => 'B',
         ];
         Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response($providerResponse, 201)]);
 
-        $response = $this->postJson(self::ROUTE, ['groupe_permis' => 'A'])
+        $response = $this->postJson(self::ROUTE, [])
             ->assertCreated()
             ->assertExactJson($providerResponse);
 
@@ -111,7 +113,7 @@ class RdvPermisStudentMandateTest extends TestCase
                 'nom' => 'Dupont',
                 'numeroDossier' => '01234567890909',
                 'email' => 'louis.dupont@example.test',
-                'groupePermis' => 'A',
+                'groupePermis' => 'B',
             ]);
         $record = RdvPermisSyncRecord::query()->sole();
         $this->assertSame('student_rdvpermis_mandate', $record->entity_type);
@@ -122,26 +124,25 @@ class RdvPermisStudentMandateTest extends TestCase
         $this->assertStringNotContainsString('imported-swagger-token', $response->getContent());
     }
 
-    public function test_it_requires_the_permit_group_and_never_calls_the_provider_when_invalid(): void
+    public function test_it_uses_category_b_without_a_request_body_or_transmission_mapping(): void
     {
-        $this->signIn('admin');
+        $actor = $this->signIn('admin');
         $this->seedStudent('01234567890909');
-        Http::fake();
+        $this->bindValidToken($actor);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response(['id' => 'mandate-123'], 201)]);
 
-        $this->postJson(self::ROUTE, [])->assertUnprocessable()->assertJsonValidationErrors('groupe_permis');
-        $this->postJson(self::ROUTE, ['groupe_permis' => 1])->assertUnprocessable()->assertJsonValidationErrors('groupe_permis');
-        Http::assertNothingSent();
-        $this->assertSame(0, RdvPermisSyncRecord::count());
+        $this->postJson(self::ROUTE, [])->assertCreated();
+        Http::assertSent(fn ($request) => $request->data()['groupePermis'] === 'B');
     }
 
-    /** @dataProvider missingLocalValues */
+    #[DataProvider('missingLocalValues')]
     public function test_it_validates_required_local_candidate_fields_before_the_provider_call(string $field): void
     {
         $this->signIn('secretary');
         $this->seedStudent($field === 'neph' ? null : '01234567890909', $field === 'last_name' ? null : 'Dupont', $field === 'email' ? null : 'louis.dupont@example.test');
         Http::fake();
 
-        $this->postJson(self::ROUTE, ['groupe_permis' => 'A'])
+        $this->postJson(self::ROUTE, [])
             ->assertUnprocessable()
             ->assertJsonStructure(['message']);
         Http::assertNothingSent();
@@ -157,10 +158,10 @@ class RdvPermisStudentMandateTest extends TestCase
     {
         $this->seedStudent('01234567890909');
         Http::fake();
-        $this->postJson(self::ROUTE, ['groupe_permis' => 'A'])->assertUnauthorized();
+        $this->postJson(self::ROUTE, [])->assertUnauthorized();
 
         $this->signIn('student');
-        $this->postJson(self::ROUTE, ['groupe_permis' => 'A'])->assertForbidden();
+        $this->postJson(self::ROUTE, [])->assertForbidden();
         Http::assertNothingSent();
     }
 
@@ -170,12 +171,12 @@ class RdvPermisStudentMandateTest extends TestCase
         $this->seedStudent('01234567890909');
         $this->bindValidToken($actor);
         Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response([
-            'code' => 'CANDIDAT_INCONNU',
+            'erreur' => 'CANDIDAT_INCONNU',
             'access_token' => 'provider-private-token',
             'detail' => 'private provider detail',
         ], 400)]);
 
-        $response = $this->postJson(self::ROUTE, ['groupe_permis' => 'A'])
+        $response = $this->postJson(self::ROUTE, [])
             ->assertStatus(400)
             ->assertExactJson(['message' => 'Le candidat est inconnu de RdvPermis.']);
 
@@ -197,7 +198,7 @@ class RdvPermisStudentMandateTest extends TestCase
             'refresh_token' => 'provider-private-refresh-token',
         ], 409)]);
 
-        $response = $this->postJson(self::ROUTE, ['groupe_permis' => 'A'])
+        $response = $this->postJson(self::ROUTE, [])
             ->assertConflict()
             ->assertExactJson(['message' => 'Cette adresse e-mail est déjà attribuée dans RdvPermis.']);
 
@@ -207,6 +208,87 @@ class RdvPermisStudentMandateTest extends TestCase
         $this->assertStringNotContainsString('provider-private-refresh-token', (string) $record->last_error);
     }
 
+    #[DataProvider('documentedMandateBusinessErrors')]
+    public function test_documented_mandate_business_errors_are_safe_and_preserve_the_provider_status(string $code, string $message): void
+    {
+        $actor = $this->signIn('admin');
+        $this->seedStudent('01234567890909');
+        $this->bindValidToken($actor);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response([
+            'code' => $code,
+            'access_token' => 'provider-private-token',
+        ], 422)]);
+
+        $response = $this->postJson(self::ROUTE, [])
+            ->assertStatus(422)
+            ->assertExactJson(['message' => $message]);
+
+        $record = RdvPermisSyncRecord::query()->sole();
+        $this->assertSame('failed', $record->status);
+        $this->assertStringNotContainsString('provider-private-token', $response->getContent());
+        $this->assertStringNotContainsString('provider-private-token', (string) $record->last_error);
+    }
+
+    public static function documentedMandateBusinessErrors(): array
+    {
+        return [
+            'candidate has no active application' => [
+                'CANDIDAT_SANS_DEMANDE_ACTIVE',
+                'Le candidat ne dispose pas de demande active dans RdvPermis.',
+            ],
+            'candidate email missing' => [
+                'EMAIL_MANQUANT',
+                'Une adresse e-mail est requise pour ce candidat dans RdvPermis.',
+            ],
+            'candidate is mandated to another school' => [
+                'CANDIDAT_DEJA_SOUS_MANDAT',
+                'Le candidat est déjà sous mandat d’une autre auto-école.',
+            ],
+            'candidate is already mandated to this school' => [
+                'CANDIDAT_DEJA_SOUS_MON_MANDAT',
+                'Le candidat est déjà sous mandat de cette auto-école.',
+            ],
+        ];
+    }
+
+    public function test_staging_returns_safe_mandate_diagnostics_and_logs_a_redacted_provider_body(): void
+    {
+        $this->app['env'] = 'staging';
+        Log::spy();
+        $actor = $this->signIn('admin');
+        $this->seedStudent('01234567890909');
+        $this->bindValidToken($actor);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response([
+            'erreur' => 'MANDAT_INVALIDE',
+            'message' => 'Le mandat ne respecte pas les règles RdvPermis.',
+            'access_token' => 'provider-private-access-token',
+            'refresh_token' => 'provider-private-refresh-token',
+            'client_secret' => 'provider-private-client-secret',
+        ], 400)]);
+
+        $response = $this->postJson(self::ROUTE, [])
+            ->assertBadRequest()
+            ->assertExactJson([
+                'message' => 'RdvPermis a refusé les données envoyées.',
+                'rdvpermis_status' => 400,
+                'rdvpermis_error' => 'MANDAT_INVALIDE',
+            ]);
+
+        Log::shouldHaveReceived('warning')->once()->with(
+            'RdvPermis API request failed',
+            Mockery::on(fn (array $context) => $context['endpoint'] === '/api/v2/auto-ecole/mandats'
+                && $context['http_status'] === 400
+                && $context['rdvpermis_error'] === 'MANDAT_INVALIDE'
+                && $context['rdvpermis_message'] === 'Le mandat ne respecte pas les règles RdvPermis.'
+                && ! str_contains((string) $context['rdvpermis_body'], 'provider-private-access-token')
+                && ! str_contains((string) $context['rdvpermis_body'], 'provider-private-refresh-token')
+                && ! str_contains((string) $context['rdvpermis_body'], 'provider-private-client-secret')),
+        );
+        $this->assertStringNotContainsString('provider-private-access-token', $response->getContent());
+        $this->assertStringNotContainsString('provider-private-refresh-token', $response->getContent());
+        $this->assertStringNotContainsString('provider-private-client-secret', $response->getContent());
+    }
+
     public function test_an_expired_imported_token_never_sends_the_mandate(): void
     {
         $actor = $this->signIn('admin');
@@ -214,7 +296,7 @@ class RdvPermisStudentMandateTest extends TestCase
         $this->bindExpiredTokenWithoutRefresh($actor);
         Http::fake();
 
-        $response = $this->postJson(self::ROUTE, ['groupe_permis' => 'A'])->assertUnauthorized();
+        $response = $this->postJson(self::ROUTE, [])->assertUnauthorized();
         $this->assertStringNotContainsString('expired-imported-token', $response->getContent());
         Http::assertNothingSent();
         $this->assertSame('failed', RdvPermisSyncRecord::query()->sole()->status);
@@ -252,7 +334,8 @@ class RdvPermisStudentMandateTest extends TestCase
 
     private function bindExpiredTokenWithoutRefresh(User $actor): void
     {
-        $token = new class extends RdvPermisToken {
+        $token = new class extends RdvPermisToken
+        {
             public function update(array $attributes = [], array $options = []): bool
             {
                 $this->forceFill($attributes);
@@ -267,7 +350,8 @@ class RdvPermisStudentMandateTest extends TestCase
         $token->refresh_token = null;
         $token->setRelation('user', $actor);
 
-        $service = new class($token) extends TokenService {
+        $service = new class($token) extends TokenService
+        {
             public function __construct(private RdvPermisToken $token) {}
 
             public function forUser(User $user): ?RdvPermisToken

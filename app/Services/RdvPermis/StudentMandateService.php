@@ -10,6 +10,8 @@ use Throwable;
 
 class StudentMandateService
 {
+    private const GROUPE_PERMIS = 'B';
+
     public function __construct(
         private readonly AutoEcoleService $autoEcole,
         private readonly RdvPermisSyncService $sync,
@@ -18,7 +20,7 @@ class StudentMandateService
     /**
      * @return array{nom:string, numeroDossier:string, email:string, groupePermis:string}
      */
-    public function payloadFor(Student $student, string $groupePermis): array
+    public function payloadFor(Student $student): array
     {
         $student->loadMissing('user');
         $user = $student->user;
@@ -35,22 +37,20 @@ class StudentMandateService
             throw new InvalidArgumentException('Une adresse e-mail valide est requise avant la synchronisation RdvPermis.');
         }
 
-        if (! filled($groupePermis)) {
-            throw new InvalidArgumentException('Le groupe de permis est requis pour la synchronisation RdvPermis.');
-        }
-
         return [
             'nom' => trim((string) $user->last_name),
             // Do not convert to an integer: the government contract requires a string.
             'numeroDossier' => (string) $student->neph,
             'email' => trim((string) $user->email),
-            'groupePermis' => trim($groupePermis),
+            // PassPermis currently handles category-B candidates. Transmission
+            // type (students.boite_type) is intentionally unrelated here.
+            'groupePermis' => self::GROUPE_PERMIS,
         ];
     }
 
-    public function synchronize(User $actor, Student $student, string $groupePermis): Response
+    public function synchronize(User $actor, Student $student): Response
     {
-        $payload = $this->payloadFor($student, $groupePermis);
+        $payload = $this->payloadFor($student);
         $record = $this->sync->markAttempt(
             $this->sync->recordFor('student_rdvpermis_mandate', (string) $student->getKey())
         );

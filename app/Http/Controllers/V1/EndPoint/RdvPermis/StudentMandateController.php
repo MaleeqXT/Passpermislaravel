@@ -15,19 +15,24 @@ class StudentMandateController extends Controller
 {
     public function store(Request $request, Student $student, StudentMandateService $mandates): JsonResponse
     {
-        $validated = $request->validate([
-            // The confirmed contract accepts the group value. Do not impose an unconfirmed enum locally.
-            'groupe_permis' => ['bail', 'required', 'string'],
-        ]);
-
         try {
-            $response = $mandates->synchronize($request->user(), $student, $validated['groupe_permis']);
+            $response = $mandates->synchronize($request->user(), $student);
 
             return response()->json($response->json(), $response->status());
         } catch (InvalidArgumentException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         } catch (RdvPermisApiException $exception) {
-            return response()->json(['message' => $exception->userMessage], $exception->responseStatus);
+            $body = ['message' => $exception->userMessage];
+
+            if (app()->environment('staging')) {
+                $body['rdvpermis_status'] = $exception->rdvPermisStatus ?? $exception->responseStatus;
+
+                if ($exception->rdvPermisError !== null) {
+                    $body['rdvpermis_error'] = $exception->rdvPermisError;
+                }
+            }
+
+            return response()->json($body, $exception->responseStatus);
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 401);
         }

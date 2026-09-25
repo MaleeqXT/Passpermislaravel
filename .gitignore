@@ -26,3 +26,6 @@ Homestead.json
 .phpunit.result.cache
 .DS_Store
 node_modules
+
+# Private RDVPermis documentation may contain access credentials.
+docs/rdvpermis/*.pdf
