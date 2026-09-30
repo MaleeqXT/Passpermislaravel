@@ -5,6 +5,7 @@ use App\Http\Controllers\V1\EndPoint\Monitor\Rating\RatingMonitorController;
 use App\Http\Controllers\V1\EndPoint\Monitor\Reservation\MonitorCancellationController;
 use App\Http\Controllers\V1\EndPoint\Monitor\Reservation\ReservationMonitorController;
 use App\Http\Controllers\V1\EndPoint\Student\Info\ListStudentByMonitorController;
+use App\Http\Controllers\V1\EndPoint\Monitor\StudentProgressController;
 use App\Http\Controllers\V1\EndPoint\Student\Proposition\ProposalTrainingController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\V1\Inertia\Monitor\User\UsersController;
@@ -85,6 +86,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             Route::get('/', 'getAllEleves')->name('index');
             Route::put('/{student}/update', 'updateEleve')->name('update');
         });
+
+    Route::get('/progress/{student}', [StudentProgressController::class, 'show'])
+        ->name('progress.show');
+    Route::put('/progress/{student}/competencies/{competency}', [StudentProgressController::class, 'updateEvaluation'])
+        ->name('progress.competencies.update');
 
     Route::prefix('reviews')->name('reviews.')
         ->controller(RatingMonitorController::class)->group(function () {

@@ -7,12 +7,18 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 // import { dependencies } from './package.json';
 // import utwm from 'unplugin-tailwindcss-mangle/vite';
 
-export default defineConfig({
-    // server: {
-    //     host: '192.168.3.8', // Bind to your local IP
-    //     port: 5174, // Ensure this matches the port you're using
-    //     cors: true, // Enable CORS for all origins
-    // },
+export default defineConfig(({ command }) => ({
+    server: {
+        // Keep this Laravel app separate from the other local dev server
+        // currently using the IPv6 loopback address ([::1]:5173).
+        host: '127.0.0.1',
+        port: 5173,
+        strictPort: true,
+        hmr: {
+            host: '127.0.0.1',
+            port: 5173,
+        },
+    },
     resolve: {
         alias: {
             '@espace-admin': path.resolve('resources/espace-admin'),
@@ -33,15 +39,24 @@ export default defineConfig({
             },
         },
     },
+    // This project has several independent Inertia entry points. Let the
+    // dev server answer requests while Vite finishes scanning all of them.
+    optimizeDeps: {
+        holdUntilCrawlEnd: false,
+    },
     plugins: [
-        viteStaticCopy({
-            targets: [
-                {
-                    src: 'resources/assets',
-                    dest: './../',
-                },
-            ],
-        }),
+        ...(command === 'build'
+            ? [
+                  viteStaticCopy({
+                      targets: [
+                          {
+                              src: 'resources/assets',
+                              dest: './../',
+                          },
+                      ],
+                  }),
+              ]
+            : []),
         svgLoader({
             svgo: false,
         }),
@@ -70,4 +85,4 @@ export default defineConfig({
         // cssCodeSplit: true,
         // outDir: 'dist', // your build folder
     },
-});
+}));
