@@ -6,6 +6,7 @@ use App\Http\Controllers\V1\EndPoint\Monitor\Reservation\MonitorCancellationCont
 use App\Http\Controllers\V1\EndPoint\Monitor\Reservation\ReservationMonitorController;
 use App\Http\Controllers\V1\EndPoint\Student\Info\ListStudentByMonitorController;
 use App\Http\Controllers\V1\EndPoint\Monitor\StudentProgressController;
+use App\Http\Controllers\V1\EndPoint\Bilan\BilanController;
 use App\Http\Controllers\V1\EndPoint\Student\Proposition\ProposalTrainingController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\V1\Inertia\Monitor\User\UsersController;
@@ -85,6 +86,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         ->controller(ListStudentByMonitorController::class)->group(function () {
             Route::get('/', 'getAllEleves')->name('index');
             Route::put('/{student}/update', 'updateEleve')->name('update');
+        });
+
+    Route::prefix('bilans')->name('bilans.')
+        ->controller(BilanController::class)->group(function () {
+            Route::get('/students', 'students')->name('students');
+            Route::get('/{student}', 'show')->name('show');
+            Route::put('/{student}', 'update')->name('update');
         });
 
     Route::get('/progress/{student}', [StudentProgressController::class, 'show'])

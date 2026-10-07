@@ -23,7 +23,7 @@ class UpdateNephRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'neph' => 'required|numeric',
+            'neph' => 'required|string|min:1',
             'date_code' => 'required|date',
         ];
     }

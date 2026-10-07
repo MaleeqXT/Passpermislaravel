@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
 use Illuminate\Support\Facades\Http;
@@ -20,7 +19,6 @@ class RdvPermisPanierSlotApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware(HandleInertiaRequests::class);
         config()->set('rdvpermis.api_url', 'https://api.example.test');
         config()->set('rdvpermis.timeout', 2);
         Http::preventStrayRequests();
@@ -62,9 +60,12 @@ class RdvPermisPanierSlotApiTest extends TestCase
     public function test_remove_slot_and_assign_or_remove_candidate_use_verified_contracts(): void
     {
         $user = $this->signIn();
-        $this->bindToken($user, 3);
+        $this->bindToken($user, 4);
         $base = 'https://api.example.test/api/v2/auto-ecole/paniers/'.self::PANIER_ID.'/creneaux/'.self::CRENEAU_ID;
         Http::fake([
+            'https://api.example.test/api/v2/auto-ecole/candidats/recherche' => Http::response([
+                ['candidat' => ['id' => 'candidate-1'], 'eligibilite' => ['estEligible' => true]],
+            ]),
             $base => Http::response('', 204),
             $base.'/candidat' => Http::sequence()->push('', 204)->push('', 204),
         ]);

@@ -11,6 +11,7 @@ use App\Models\Roles\Student\User\Student;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Services\SatisfactionLifecycleService;
 
 class AdminExamController extends Controller
 {
@@ -69,6 +70,9 @@ class AdminExamController extends Controller
         }
 
         $exam->save();
+
+        // date_examen is the authoritative staff-confirmed exam assignment.
+        app(SatisfactionLifecycleService::class)->evaluate($student->fresh());
 
         $student = $this->studentsQuery()->findOrFail($student->id);
 

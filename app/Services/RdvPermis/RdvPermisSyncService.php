@@ -3,6 +3,7 @@
 namespace App\Services\RdvPermis;
 
 use App\Models\RdvPermisSyncRecord;
+use App\Exceptions\RdvPermisApiException;
 use Throwable;
 
 /**
@@ -31,11 +32,14 @@ class RdvPermisSyncService
         return $record;
     }
 
-    public function markSynced(RdvPermisSyncRecord $record, ?string $remoteId = null): RdvPermisSyncRecord
+    public function markSynced(RdvPermisSyncRecord $record, ?string $remoteId = null, array $mapping = []): RdvPermisSyncRecord
     {
         $record->forceFill([
             'status' => 'synced',
-            'remote_id' => $remoteId ?? $record->remote_id,
+            'remote_id' => filled($remoteId) ? $remoteId : $record->remote_id,
+            ...array_filter(array_intersect_key($mapping, array_flip([
+                'remote_candidate_id', 'permit_group', 'remote_school_id', 'provider_context',
+            ])), fn ($value) => filled($value)),
             'synced_at' => now(),
             'last_error' => null,
         ])->save();
@@ -45,7 +49,8 @@ class RdvPermisSyncService
 
     public function markFailed(RdvPermisSyncRecord $record, Throwable|string $error): RdvPermisSyncRecord
     {
-        $message = $error instanceof Throwable ? $error->getMessage() : $error;
+        $message = $error instanceof RdvPermisApiException ? $error->userMessage
+            : ($error instanceof Throwable ? 'RdvPermis synchronization failed internally.' : $error);
 
         $record->forceFill([
             'status' => 'failed',

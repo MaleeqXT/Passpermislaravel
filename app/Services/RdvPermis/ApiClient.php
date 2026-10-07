@@ -24,6 +24,8 @@ class ApiClient
         }
 
         $method = strtoupper($method);
+        $cooldown = app(ProviderCooldown::class);
+        $cooldown->assertAvailable('api', $user->getKey());
 
         try {
             $response = Http::acceptJson()
@@ -55,6 +57,11 @@ class ApiClient
         ]);
 
         if (! $response->successful()) {
+            if ($response->status() === 429) {
+                $retry = $cooldown->record('api', $user->getKey(), $response->header('Retry-After'));
+                throw new RdvPermisApiException('RdvPermis reçoit trop de demandes. Réessayez plus tard.', 429,
+                    rdvPermisStatus: 429, retryAfter: $retry);
+            }
             if ($response->status() === 401) {
                 $this->tokens->markNeedsReauthentication($user);
             }
@@ -101,7 +108,9 @@ class ApiClient
     {
         $exceptionDetails = [null, $response->status(), $providerCode];
 
-        if (($message = $this->businessMessage($providerCode)) !== null) {
+        if ($response->status() >= 400 && $response->status() < 500
+            && ! in_array($response->status(), [401, 403, 429], true)
+            && ($message = $this->businessMessage($providerCode)) !== null) {
             return new RdvPermisApiException(
                 $message,
                 $response->status(),
@@ -161,6 +170,12 @@ class ApiClient
     private function businessMessage(?string $providerCode): ?string
     {
         return match ($providerCode) {
+            'PANIER_PLEIN' => 'Le panier RdvPermis est plein.',
+            'CRENEAU_NON_DISPONIBLE' => 'Ce créneau n’est plus disponible dans RdvPermis.',
+            'CRENEAU_NON_RESERVABLE_SEUIL_ATTEINT' => 'Le seuil de réservation RdvPermis est atteint pour ce créneau.',
+            'CRENEAU_NON_RESERVABLE_PLAFOND_ATTEINT' => 'Le plafond de réservation RdvPermis est atteint pour ce créneau.',
+            'CRENEAU_DE_GROUPE_DIFFERENT' => 'Le groupe de permis du créneau est incompatible.',
+            'AUTO_ECOLE_NA_AUCUNE_DECLARATION' => 'L’auto-école ne dispose d’aucune déclaration dans RdvPermis.',
             'CANDIDAT_INCONNU' => 'Le candidat est inconnu de RdvPermis.',
             'CANDIDAT_SANS_DEMANDE_ACTIVE' => 'Le candidat ne dispose pas de demande active dans RdvPermis.',
             'EMAIL_MANQUANT' => 'Une adresse e-mail est requise pour ce candidat dans RdvPermis.',

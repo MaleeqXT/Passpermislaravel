@@ -27,6 +27,11 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
+        // Keep web/session/auth middleware, but skip unrelated Inertia page queries.
+        if ($request->is('api/rdvpermis', 'api/rdvpermis/*', 'api/admin/students/*/rdvpermis/*')) {
+            return [];
+        }
+
         // React chat returns JSON only. Do not run training/progression queries
         // and prepare Inertia page props on every message, poll or socket auth.
         if ($request->is('api/chat/*', 'api/conversations', 'api/conversations/*', 'api/broadcasting/auth')) {

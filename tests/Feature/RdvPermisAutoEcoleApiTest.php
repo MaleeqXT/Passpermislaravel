@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\RdvPermisToken;
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
@@ -20,8 +19,6 @@ class RdvPermisAutoEcoleApiTest extends TestCase
     {
         parent::setUp();
 
-        // The SPA's shared props query unrelated tables. Keep auth and role middleware enabled.
-        $this->withoutMiddleware(HandleInertiaRequests::class);
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
         config()->set('app.debug', false);

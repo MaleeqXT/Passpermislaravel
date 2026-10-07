@@ -27,7 +27,7 @@ class StoreStudentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'neph' => 'nullable|digits:12|unique:students,neph',
+            'neph' => 'nullable|string|min:1|unique:students,neph',
             'is_cpf' => 'required|boolean',
             'date_code' => 'nullable|date',
             // 'how_know' => 'nullable|string',
@@ -55,8 +55,8 @@ class StoreStudentRequest extends FormRequest
     {
         return [
             'neph.required' => 'Le NEPH est requis.',
-            'neph.integer' => 'Le NEPH doit être un nombre.',
-            'neph.min' => 'Le NEPH doit comporter au moins 12 chiffres.',
+            'neph.string' => 'Le NEPH doit être une chaîne de caractères.',
+            'neph.min' => 'Le NEPH ne peut pas être vide.',
             'neph.unique' => 'Le NEPH est déjà utilisé.',
             'is_cpf.required' => 'Le CPF est requis.',
             'is_cpf.boolean' => 'Le CPF doit être un booléen.',

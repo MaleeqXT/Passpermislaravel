@@ -227,7 +227,7 @@ const heading = props.isEdit ? 'Modifier Sectory' : 'Nouveau Secretary';
                                 v-model="form.neph"
                                 :error="form.errors.neph"
                                 label="Neph"
-                                mask="### ### ### ###"
+
                                 required
                             />
 

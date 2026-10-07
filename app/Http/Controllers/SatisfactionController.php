@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\SatisfactionSubmitRequest;
 use App\Models\{SatisfactionAnswer,SatisfactionNotification,SatisfactionResponse,SatisfactionSurvey};
 use App\Models\Roles\Student\User\Student;
-use App\Services\SatisfactionStageService;
+use App\Services\SatisfactionLifecycleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -13,11 +13,12 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class SatisfactionController extends Controller
 {
-    public function available(Request $request, SatisfactionStageService $st)
+    public function available(Request $request, SatisfactionLifecycleService $lifecycle)
     {
         $student = $this->resolveAuthenticatedStudent($request);
         if (!$student) return response()->json(['data' => null]);
-        $response = SatisfactionResponse::query()->with('survey.questions')->where('candidate_id', $student->id)->where('status', 'started')->latest()->first();
+        $response = $lifecycle->evaluate($student);
+        $response = $response?->load('survey.questions');
         $survey = $response?->survey;
         if ($survey) {
             $survey->completed = false;
@@ -83,6 +84,9 @@ class SatisfactionController extends Controller
             ->where('response_id', $response->id)
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
+        // If later lifecycle conditions were already met, prepare only the
+        // next stage now that this one is completed.
+        app(SatisfactionLifecycleService::class)->evaluate($student);
         $payload = $response->load('answers');
         $payload->google_review_url = $response->google_choice === 'yes' ? config('satisfaction.google_review_url') : null;
         return response()->json(['data'=>$payload], 201);

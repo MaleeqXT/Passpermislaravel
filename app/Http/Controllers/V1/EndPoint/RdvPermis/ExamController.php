@@ -8,10 +8,11 @@ use App\Services\RdvPermis\ExamService;
 use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
 
 class ExamController extends Controller
 {
+    use HandlesRdvPermisErrors;
+
     public function index(Request $request, ExamService $exams): JsonResponse
     {
         $validated = $request->validate([
@@ -113,9 +114,9 @@ class ExamController extends Controller
 
             return response()->json($response->json(), $response->status());
         } catch (RdvPermisApiException $exception) {
-            return response()->json(['message' => $exception->userMessage], $exception->responseStatus);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 401);
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
         }
     }
 }

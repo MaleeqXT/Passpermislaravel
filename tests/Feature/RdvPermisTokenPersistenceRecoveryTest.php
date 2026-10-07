@@ -6,11 +6,9 @@ use App\Models\RdvPermisToken;
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
 use Illuminate\Contracts\Encryption\DecryptException;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Tests\TestCase;
 
@@ -31,13 +29,12 @@ class RdvPermisTokenPersistenceRecoveryTest extends TestCase
         DB::setDefaultConnection('rdvpermis_token_recovery_test');
         Log::spy();
 
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedTinyInteger('status')->default(1);
-        });
+        (require database_path('migrations/2024_12_24_000006_create_users_table.php'))->up();
         (require database_path('migrations/2026_08_22_000000_create_rdvpermis_tokens_table.php'))->up();
-        Schema::rename('rdvpermis_tokens', (new RdvPermisToken)->getTable());
-        DB::table('users')->insert([['id' => 1], ['id' => 2]]);
+        DB::table('users')->insert(array_map(fn ($id) => [
+            'id' => $id, 'first_name' => 'Fixture', 'last_name' => 'User', 'name' => 'Fixture User',
+            'email' => 'fixture'.$id.'@example.test', 'password' => 'fixture',
+        ], [1, 2]));
     }
 
     protected function tearDown(): void

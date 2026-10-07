@@ -27,7 +27,7 @@ class UpdateStudentRequest extends FormRequest
     {
         
         return [
-            'neph' => 'nullable|numeric',
+            'neph' => 'nullable|string|min:1',
             'is_cpf' => 'required|boolean',
             'date_code' => 'nullable|date',
             'date_expiration_code' => 'nullable|date',

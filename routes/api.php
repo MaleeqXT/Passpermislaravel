@@ -7,6 +7,7 @@ use App\Http\Controllers\Backend\Front\Offers\OffersController;
 use App\Http\Controllers\Backend\Front\StudentsController;
 use App\Http\Controllers\ReservationCommentController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\CandidateMandateController;
+use App\Http\Controllers\V1\EndPoint\RdvPermis\CandidateEligibilityController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\CentreController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\ExamController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\PanierController;
@@ -102,6 +103,7 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary'])->prefix(
     Route::get('/current-school', [RdvPermisController::class, 'currentSchool'])->name('current-school');
     Route::get('/employees', [RdvPermisController::class, 'employees'])->name('employees');
     Route::post('/planning/recherche', [PlanningController::class, 'search'])->name('planning.search');
+    Route::post('/candidats/recherche', [CandidateEligibilityController::class, 'search'])->name('candidates.eligibility');
     Route::post('/candidats-mandats/recherche', [CandidateMandateController::class, 'search'])->name('candidates-mandates.search');
     Route::post('/centres/recherche', [CentreController::class, 'search'])->name('centres.search');
     Route::get('/centres-favoris', [CentreController::class, 'favorites'])->name('centres-favoris.index');

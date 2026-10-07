@@ -270,7 +270,7 @@ const heading = props.isEdit ? 'Modifier Candidat' : 'Nouveau Candidat';
                                 v-model="form.neph"
                                 :error="form.errors.neph"
                                 label="Neph"
-                                mask="### ### ### ###"
+
                                 required
                             />
 

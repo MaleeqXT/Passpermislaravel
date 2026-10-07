@@ -2,16 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\RdvPermisSyncRecord;
 use App\Models\RdvPermisToken;
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -28,7 +25,6 @@ class RdvPermisStudentMandateTest extends TestCase
     {
         parent::setUp();
 
-        $this->withoutMiddleware(HandleInertiaRequests::class);
         config()->set('database.default', 'rdvpermis_mandate_test');
         config()->set('database.connections.rdvpermis_mandate_test', [
             'driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true,
@@ -40,46 +36,13 @@ class RdvPermisStudentMandateTest extends TestCase
         config()->set('rdvpermis.timeout', 2);
         Http::preventStrayRequests();
 
-        Schema::create('users', function (Blueprint $table) {
-            $table->unsignedBigInteger('id')->primary();
-            $table->string('first_name')->nullable();
-            $table->string('last_name')->nullable();
-            $table->string('name')->nullable();
-            $table->string('email')->nullable();
-            $table->integer('status')->nullable();
-            $table->softDeletes();
-            $table->timestamps();
-        });
-        Schema::create('students', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->unsignedBigInteger('user_id');
-            $table->string('neph')->nullable();
-            $table->softDeletes();
-            $table->timestamps();
-        });
-        Schema::create('monitors', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->unsignedBigInteger('user_id')->nullable();
-            $table->softDeletes();
-        });
-        Schema::create('secretaries', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->unsignedBigInteger('user_id')->nullable();
-            $table->softDeletes();
-        });
-        Schema::create((new RdvPermisSyncRecord)->getTable(), function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('entity_type', 100);
-            $table->string('entity_id', 100);
-            $table->string('remote_id', 100)->nullable();
-            $table->string('status', 100)->default('pending');
-            $table->timestamp('synced_at')->nullable();
-            $table->timestamp('last_sync_attempt_at')->nullable();
-            $table->unsignedSmallInteger('sync_attempts')->default(0);
-            $table->text('last_error')->nullable();
-            $table->timestamps();
-            $table->unique(['entity_type', 'entity_id']);
-        });
+        (require database_path('migrations/2024_12_24_000006_create_users_table.php'))->up();
+        (require database_path('migrations/2024_12_31_200006_create_students_table.php'))->up();
+        (require database_path('migrations/2026_10_07_000002_store_neph_as_text.php'))->up();
+        (require database_path('migrations/2024_12_31_210115_create_monitors_table.php'))->up();
+        (require database_path('migrations/2025_09_25_071630_create_secretaries_table.php'))->up();
+        (require database_path('migrations/2026_08_22_000001_create_rdvpermis_sync_records_table.php'))->up();
+        (require database_path('migrations/2026_10_07_000003_add_rdvpermis_candidate_mapping.php'))->up();
     }
 
     protected function tearDown(): void
@@ -96,7 +59,7 @@ class RdvPermisStudentMandateTest extends TestCase
         $providerResponse = [
             'id' => 'mandate-123',
             'candidatId' => 'candidate-456',
-            'autoEcole' => 'school-789',
+            'autoEcole' => ['id' => 'school-789'],
             'groupePermis' => 'B',
         ];
         Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response($providerResponse, 201)]);
@@ -112,13 +75,18 @@ class RdvPermisStudentMandateTest extends TestCase
             && $request->data() === [
                 'nom' => 'Dupont',
                 'numeroDossier' => '01234567890909',
-                'email' => 'louis.dupont@example.test',
                 'groupePermis' => 'B',
+                'email' => 'louis.dupont@example.test',
             ]);
         $record = RdvPermisSyncRecord::query()->sole();
         $this->assertSame('student_rdvpermis_mandate', $record->entity_type);
         $this->assertSame(self::STUDENT_ID, $record->entity_id);
         $this->assertSame('mandate-123', $record->remote_id);
+        $this->assertSame('candidate-456', $record->remote_candidate_id);
+        $this->assertSame('school-789', $record->remote_school_id);
+        $this->assertSame('B', $record->permit_group);
+        $this->assertNotNull($record->synced_at);
+        $this->assertSame('https://api.example.test', $record->provider_context['api_url']);
         $this->assertSame('synced', $record->status);
         $this->assertSame(1, $record->sync_attempts);
         $this->assertStringNotContainsString('imported-swagger-token', $response->getContent());
@@ -133,6 +101,55 @@ class RdvPermisStudentMandateTest extends TestCase
 
         $this->postJson(self::ROUTE, [])->assertCreated();
         Http::assertSent(fn ($request) => $request->data()['groupePermis'] === 'B');
+    }
+
+    public function test_missing_local_email_is_omitted_and_provider_can_accept_existing_candidate(): void
+    {
+        $actor = $this->signIn('admin');
+        $this->seedStudent('01234567890909', 'Dupont', null);
+        $this->bindValidToken($actor);
+        Http::fake(['*' => Http::response(['id' => 'mandate', 'candidatId' => 'candidate'], 201)]);
+        $this->postJson(self::ROUTE, [])->assertCreated();
+        Http::assertSent(fn ($request) => ! array_key_exists('email', $request->data()));
+        $this->assertSame('candidate', RdvPermisSyncRecord::query()->sole()->remote_candidate_id);
+    }
+
+    public function test_provider_email_requirement_is_authoritative_when_local_email_is_missing(): void
+    {
+        $actor = $this->signIn('admin');
+        $this->seedStudent('01234567890909', 'Dupont', null);
+        $this->bindValidToken($actor);
+        Http::fake(['*' => Http::response(['code' => 'EMAIL_MANQUANT'], 400)]);
+        $this->postJson(self::ROUTE, [])->assertBadRequest()
+            ->assertExactJson(['message' => 'Une adresse e-mail est requise pour ce candidat dans RdvPermis.']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_invalid_provided_email_is_rejected_locally(): void
+    {
+        $this->signIn('admin');
+        $this->seedStudent('01234567890909', 'Dupont', 'invalid-email');
+        $this->postJson(self::ROUTE, [])->assertUnprocessable();
+        Http::assertNothingSent();
+    }
+
+    public function test_successful_mapping_survives_a_later_incomplete_success(): void
+    {
+        $actor = $this->signIn('admin');
+        $this->seedStudent('01234567890909');
+        $tokens = Mockery::mock(TokenService::class);
+        $tokens->shouldReceive('accessToken')->twice()->andReturn('fixture-token');
+        $this->app->instance(TokenService::class, $tokens);
+        Http::fake(['*' => Http::sequence()->push([
+            'id' => 'mandate', 'candidatId' => 'candidate', 'autoEcole' => ['id' => 'school'], 'groupePermis' => 'B',
+        ], 201)->push([], 201)]);
+        $this->postJson(self::ROUTE, [])->assertCreated();
+        $this->postJson(self::ROUTE, [])->assertCreated();
+        $record = RdvPermisSyncRecord::query()->sole();
+        $this->assertSame('mandate', $record->remote_id);
+        $this->assertSame('candidate', $record->remote_candidate_id);
+        $this->assertSame('school', $record->remote_school_id);
+        $this->assertSame(2, $record->sync_attempts);
     }
 
     #[DataProvider('missingLocalValues')]
@@ -151,7 +168,7 @@ class RdvPermisStudentMandateTest extends TestCase
 
     public static function missingLocalValues(): array
     {
-        return [['neph'], ['last_name'], ['email']];
+        return [['neph'], ['last_name']];
     }
 
     public function test_guests_and_non_administrative_users_cannot_send_a_mandate(): void
@@ -305,8 +322,8 @@ class RdvPermisStudentMandateTest extends TestCase
     private function seedStudent(?string $neph, ?string $lastName = 'Dupont', ?string $email = 'louis.dupont@example.test'): void
     {
         DB::table('users')->insert([
-            'id' => 1, 'first_name' => 'Louis', 'last_name' => $lastName,
-            'name' => trim('Louis '.($lastName ?? '')), 'email' => $email,
+            'id' => 1, 'first_name' => 'Louis', 'last_name' => $lastName ?? '',
+            'name' => trim('Louis '.($lastName ?? '')), 'email' => $email ?? '', 'password' => 'fixture',
             'created_at' => now(), 'updated_at' => now(),
         ]);
         DB::table('students')->insert([

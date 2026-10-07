@@ -20,10 +20,16 @@ class FirstHourSatisfactionNotification extends Notification implements ShouldQu
 
     public function toMail($notifiable): MailMessage
     {
+        $message = match ($this->stage) {
+            'before_training' => 'Votre inscription est confirmée. Donnez-nous votre avis sur votre accueil chez PassPermisFacile.',
+            'after_training' => 'Votre date d’examen est confirmée. Partagez votre expérience avec PassPermisFacile.',
+            default => 'Votre formation avance. Donnez-nous votre avis sur votre expérience chez PassPermisFacile.',
+        };
+
         return (new MailMessage)
             ->subject('Votre avis sur votre formation PassPermisFacile')
             ->greeting('Bonjour,')
-            ->line('Votre avis nous aide à améliorer votre expérience.')
+            ->line($message)
             ->action('Donner mon avis', rtrim(config('satisfaction.frontend_url'), '/') . '/satisfaction')
             ->line('Merci de prendre quelques minutes pour répondre à notre enquête de satisfaction.')
             ->salutation('L’équipe PassPermisFacile');

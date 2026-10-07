@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
 use Illuminate\Support\Facades\Http;
@@ -16,7 +15,6 @@ class RdvPermisCentreApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware(HandleInertiaRequests::class);
         config()->set('rdvpermis.api_url', 'https://api.example.test');
         config()->set('rdvpermis.timeout', 2);
         Http::preventStrayRequests();

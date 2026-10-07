@@ -43,7 +43,7 @@ const onSubmit = () => {
 <template>
     <PageMobile title="Examen Infos" :width="SizeEnum.SM" :actions="actions" back>
         <Card class="grid gap-3 mt-4">
-            <InputField id="neph" v-model="form.neph" :error="form.errors.neph" label="Neph" mask="### ### ### ###" required />
+            <InputField id="neph" v-model="form.neph" :error="form.errors.neph" label="Neph" required />
             <DateField
                 v-model="form.date_code"
                 :error="form.errors.date_code"

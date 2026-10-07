@@ -17,6 +17,7 @@ use App\Http\Controllers\V1\EndPoint\Student\Document\StudentDocumentController;
 use App\Http\Controllers\SatisfactionController;
 use App\Http\Controllers\V1\EndPoint\Student\Exam\StudentExamController;
 use App\Http\Controllers\V1\EndPoint\Student\StudentProgressController;
+use App\Http\Controllers\V1\EndPoint\Bilan\BilanController;
 
 
 /*
@@ -33,6 +34,8 @@ use App\Http\Controllers\V1\EndPoint\Student\StudentProgressController;
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'slow'])->group(function () {
     Route::get('/exams', [StudentExamController::class, 'index'])->name('student.exams.index');
     Route::get('/progress', [StudentProgressController::class, 'show'])->name('student.progress.show');
+    Route::get('/progress/lessons/{reservation}', [StudentProgressController::class, 'lessonDetail'])->name('student.progress.lessons.show');
+    Route::get('/bilans', [BilanController::class, 'showForStudent'])->name('student.bilans.show');
     Route::put('/progress/competencies/{competency}/comment', [StudentProgressController::class, 'updateStudentComment'])
         ->name('student.progress.competencies.comment.update');
 

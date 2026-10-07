@@ -27,7 +27,7 @@ class RegisterStudentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'neph' => 'nullable|unique:students,neph',
+            'neph' => 'nullable|string|min:1|unique:students,neph',
             'neph_status' => 'nullable|in:sans_neph,avec_neph',
             'date_code' => 'nullable|date',
             'how_know' => 'nullable|string',
@@ -57,8 +57,8 @@ class RegisterStudentRequest extends FormRequest
     {
         return [
             'neph.required' => 'Le NEPH est requis.',
-            'neph.integer' => 'Le NEPH doit être un nombre.',
-            'neph.min' => 'Le NEPH doit comporter au moins 12 chiffres.',
+            'neph.string' => 'Le NEPH doit être une chaîne de caractères.',
+            'neph.min' => 'Le NEPH ne peut pas être vide.',
             'neph.unique' => 'Le NEPH est déjà utilisé.',
             'neph_status.in' => 'Le statut NEPH sélectionné est invalide.',
             'email.required' => 'L\'email est requis.',

@@ -174,6 +174,61 @@ class StudentProgressController extends Controller
         ]]);
     }
 
+    public function lessonDetail(Request $request, Reservation $reservation): JsonResponse
+    {
+        $student = $request->user()?->student;
+
+        if (!$student) {
+            return response()->json(['message' => 'Élève introuvable.'], 404);
+        }
+
+        $reservation->load([
+            'training.offer',
+            'monitor.user',
+            'reviewMonitor',
+            'latestComment',
+            'evaluation',
+        ]);
+
+        if ((string) $reservation->training?->student_id !== (string) $student->id) {
+            return response()->json(['message' => 'Leçon introuvable.'], 404);
+        }
+
+        $date = $reservation->date instanceof Carbon ? $reservation->date : Carbon::parse($reservation->date);
+        $monitorName = $reservation->monitor?->user?->name ?? '';
+        $evaluationData = is_array($reservation->evaluation?->data) ? $reservation->evaluation->data : [];
+        $maneuvers = $evaluationData['manoeuvres'] ?? $evaluationData['maneuvers'] ?? [];
+
+        if (!is_array($maneuvers)) {
+            $maneuvers = array_filter([(string) $maneuvers]);
+        }
+
+        return response()->json(['data' => [
+            'id' => (string) $reservation->id,
+            'date' => $date->format('Y-m-d'),
+            'duration' => $this->formatMinutes($this->minutes($reservation)),
+            'startAt' => $this->time($reservation->start_at),
+            'monitor' => $monitorName ?: null,
+            'type' => $reservation->training?->session_type
+                ?? $reservation->training?->prestation
+                ?? $reservation->training?->offer?->name,
+            'gearbox' => $this->gearboxLabel($student->boite_type),
+            'evaluations' => [
+                'initial' => $this->nullableBoolean($evaluationData['evaluation_initiale'] ?? $evaluationData['initial_evaluation'] ?? null),
+                'permit' => $this->nullableBoolean($evaluationData['evaluation_permis'] ?? $evaluationData['permit_evaluation'] ?? null),
+            ],
+            'maneuvers' => array_values($maneuvers),
+            'publicObservation' => $evaluationData['public_observations']
+                ?? $reservation->latestComment?->comment
+                ?? null,
+            'teacherObservation' => $evaluationData['teacher_observations']
+                ?? $evaluationData['observations_enseignant']
+                ?? $reservation->reviewMonitor?->comment
+                ?? null,
+            'isAbsent' => (bool) $reservation->reviewMonitor?->is_absent,
+        ]]);
+    }
+
     private function appointment(Reservation $reservation): array
     {
         $date = $reservation->date instanceof Carbon ? $reservation->date : Carbon::parse($reservation->date);
@@ -236,5 +291,25 @@ class StudentProgressController extends Controller
     private function formatMinutes(int $minutes): string
     {
         return intdiv($minutes, 60) . 'h' . str_pad((string) ($minutes % 60), 2, '0', STR_PAD_LEFT);
+    }
+
+    private function gearboxLabel(mixed $boxType): ?string
+    {
+        if ($boxType === null || $boxType === '') {
+            return null;
+        }
+
+        return in_array(strtolower((string) $boxType), ['1', 'automatic', 'automatique', 'auto', 'ba'], true)
+            ? 'Boîte automatique'
+            : 'Boîte manuelle';
+    }
+
+    private function nullableBoolean(mixed $value): ?bool
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? (bool) $value;
     }
 }

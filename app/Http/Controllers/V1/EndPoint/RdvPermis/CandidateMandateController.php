@@ -7,10 +7,11 @@ use App\Http\Controllers\Controller;
 use App\Services\RdvPermis\CandidateMandateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
 
 class CandidateMandateController extends Controller
 {
+    use HandlesRdvPermisErrors;
+
     public function search(Request $request, CandidateMandateService $candidates): JsonResponse
     {
         $validated = $request->validate([
@@ -31,9 +32,9 @@ class CandidateMandateController extends Controller
 
             return response()->json($response->json(), $response->status());
         } catch (RdvPermisApiException $exception) {
-            return response()->json(['message' => $exception->userMessage], $exception->responseStatus);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 401);
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
         }
     }
 }

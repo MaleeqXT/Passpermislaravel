@@ -36,7 +36,7 @@ class AutoEcoleService
      * Creates a mandate for an already-existing RDVPermis candidate.
      * Candidate lookup/creation remains a separate government workflow.
      *
-     * @param array{nom:string, numeroDossier:string, email:string, groupePermis:string} $payload
+     * @param array{nom:string, numeroDossier:string, email?:string, groupePermis:string} $payload
      */
     public function createMandate(User $user, array $payload): Response
     {

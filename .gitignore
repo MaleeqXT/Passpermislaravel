@@ -29,3 +29,9 @@ node_modules
 
 # Private RDVPermis documentation may contain access credentials.
 docs/rdvpermis/*.pdf
+
+# Root-level backup archives can contain .env and credentials.
+/*.zip
+/*.7z
+/*.tar
+/*.tar.gz

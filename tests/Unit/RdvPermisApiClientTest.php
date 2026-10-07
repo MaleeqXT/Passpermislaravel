@@ -31,7 +31,7 @@ class RdvPermisApiClientTest extends TestCase
         $tokens->shouldNotReceive('markNeedsReauthentication');
 
         try {
-            (new ApiClient($tokens))->get(new User, '/api/v2/auto-ecole/moi');
+            (new ApiClient($tokens))->get((new User)->forceFill(['id' => 1]), '/api/v2/auto-ecole/moi');
             $this->fail('A connection failure must return a sanitized error.');
         } catch (RdvPermisApiException $exception) {
             $this->assertSame(503, $exception->responseStatus);
@@ -61,7 +61,7 @@ class RdvPermisApiClientTest extends TestCase
         $tokens->shouldNotReceive('markNeedsReauthentication');
 
         try {
-            (new ApiClient($tokens))->request(new User, 'GET', '/api/v2/auto-ecole/moi', ['allow_redirects' => true]);
+            (new ApiClient($tokens))->request((new User)->forceFill(['id' => 1]), 'GET', '/api/v2/auto-ecole/moi', ['allow_redirects' => true]);
             $this->fail('A redirect must be handled as an upstream error.');
         } catch (RdvPermisApiException $exception) {
             $this->assertSame(502, $exception->responseStatus);

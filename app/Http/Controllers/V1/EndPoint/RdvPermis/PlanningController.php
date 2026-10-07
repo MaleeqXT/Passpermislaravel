@@ -7,10 +7,11 @@ use App\Http\Controllers\Controller;
 use App\Services\RdvPermis\PlanningService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
 
 class PlanningController extends Controller
 {
+    use HandlesRdvPermisErrors;
+
     public function search(Request $request, PlanningService $planning): JsonResponse
     {
         $validated = $request->validate([
@@ -29,9 +30,9 @@ class PlanningController extends Controller
 
             return response()->json($response->json(), $response->status());
         } catch (RdvPermisApiException $exception) {
-            return response()->json(['message' => $exception->userMessage], $exception->responseStatus);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 401);
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
         }
     }
 }

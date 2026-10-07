@@ -12,25 +12,32 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 use Throwable;
 
 class RdvPermisController extends Controller
 {
+    use HandlesRdvPermisErrors;
+
     public function status(Request $request, TokenService $tokens): JsonResponse
     {
-        $token = $tokens->forUser($request->user());
+        try {
+            $token = $tokens->forUser($request->user());
+        } catch (Throwable $exception) {
+            return $this->internalError($exception);
+        }
+        $status = $tokens->readiness($token);
+        if ($status === 'connected' && $this->missingConfiguration() !== []) {
+            $status = 'connection_unverified';
+        }
 
         return response()->json(['data' => [
             'environment' => config('rdvpermis.environment'),
             'configured' => $this->missingConfiguration() === [],
             'missing_configuration' => $this->missingConfiguration(),
-            'status' => $token?->status ?? 'not_connected',
-            'connected' => $token?->status === 'connected',
+            'status' => $status,
+            'connected' => $status === 'connected',
             'expires_at' => $token?->access_token_expires_at?->toIso8601String(),
-            'last_error' => in_array($token?->status, ['reconnect_required', 'needs_reauthentication'], true)
-                ? $token->last_error
-                : null,
+            'last_error' => $status === 'reconnect_required' ? 'La connexion RdvPermis doit être renouvelée.' : null,
         ]]);
     }
 
@@ -45,8 +52,10 @@ class RdvPermisController extends Controller
 
         try {
             return response()->json(['data' => ['authorization_url' => $oauth->authorizationUrl($request->user())]]);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 503);
+        } catch (RdvPermisOAuthException $exception) {
+            return response()->json(['message' => 'La connexion RdvPermis ne peut pas être initialisée.'], 503);
+        } catch (Throwable $exception) {
+            return $this->internalError($exception);
         }
     }
 
@@ -111,9 +120,9 @@ class RdvPermisController extends Controller
 
             return response()->json($response->json(), $response->status());
         } catch (RdvPermisApiException $exception) {
-            return response()->json(['message' => $exception->userMessage], $exception->responseStatus);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 401);
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
         }
     }
 
@@ -124,9 +133,9 @@ class RdvPermisController extends Controller
 
             return response()->json($response->json(), $response->status());
         } catch (RdvPermisApiException $exception) {
-            return response()->json(['message' => $exception->userMessage], $exception->responseStatus);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 401);
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
         }
     }
 
@@ -210,7 +219,6 @@ class RdvPermisController extends Controller
             'authorization_url' => 'RDVPERMIS_AUTH_URL',
             'token_url' => 'RDVPERMIS_TOKEN_URL',
             'api_url' => 'RDVPERMIS_API_URL',
-            'current_school_path' => 'RDVPERMIS_CURRENT_SCHOOL_PATH',
             'redirect_uri' => 'RDVPERMIS_REDIRECT_URI',
             'frontend_callback_url' => 'RDVPERMIS_FRONTEND_CALLBACK_URL',
         ];

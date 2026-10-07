@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Illuminate\Support\Facades\Log;
+use App\Services\SatisfactionLifecycleService;
 
 
 class PaymentService
@@ -930,6 +931,8 @@ class PaymentService
             ]);
 
             DB::commit();
+            // A confirmed paid sale is the only Before-survey trigger.
+            app(SatisfactionLifecycleService::class)->evaluate($student->fresh());
             session()->flash('success', 'Payment completed.');
             return response()->json([
                 'success' => $status,

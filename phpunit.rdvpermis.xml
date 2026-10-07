@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php" colors="true">
+    <testsuites>
+        <testsuite name="RdvPermis">
+            <file>tests/Feature/RdvPermisAutoEcoleApiTest.php</file>
+            <file>tests/Feature/RdvPermisCentreApiTest.php</file>
+            <file>tests/Feature/RdvPermisEligibilityAndErrorsTest.php</file>
+            <file>tests/Feature/RdvPermisExamApiTest.php</file>
+            <file>tests/Feature/RdvPermisFreshMigrationTest.php</file>
+            <file>tests/Feature/RdvPermisImportAccessTokenCommandTest.php</file>
+            <file>tests/Feature/RdvPermisOAuthCallbackTest.php</file>
+            <file>tests/Feature/RdvPermisPanierApiTest.php</file>
+            <file>tests/Feature/RdvPermisPanierSlotApiTest.php</file>
+            <file>tests/Feature/RdvPermisPlanningApiTest.php</file>
+            <file>tests/Feature/RdvPermisReadinessTest.php</file>
+            <file>tests/Feature/RdvPermisRefreshSafetyTest.php</file>
+            <file>tests/Feature/RdvPermisStudentMandateTest.php</file>
+            <file>tests/Feature/RdvPermisTokenPersistenceRecoveryTest.php</file>
+            <file>tests/Unit/RdvPermisApiClientTest.php</file>
+            <file>tests/Unit/RdvPermisAutoEcoleServiceTest.php</file>
+            <file>tests/Unit/RdvPermisOAuthConfigurationTest.php</file>
+            <file>tests/Unit/RdvPermisPanierServiceTest.php</file>
+            <file>tests/Unit/RdvPermisSyncServiceTest.php</file>
+            <file>tests/Unit/RdvPermisTokenServiceTest.php</file>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_DEBUG" value="false" force="true"/>
+        <env name="DB_CONNECTION" value="sqlite" force="true"/>
+        <env name="DB_DATABASE" value=":memory:" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="RDVPERMIS_CACHE_STORE" value="array" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="LOG_CHANNEL" value="single" force="true"/>
+        <env name="BUGSNAG_NOTIFY_RELEASE_STAGES" value="production" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+    </php>
+</phpunit>

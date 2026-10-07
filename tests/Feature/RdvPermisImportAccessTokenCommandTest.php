@@ -8,12 +8,10 @@ use App\Models\RdvPermisToken;
 use App\Models\User;
 use App\Services\RdvPermis\AutoEcoleService;
 use App\Services\RdvPermis\TokenService;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -41,16 +39,12 @@ class RdvPermisImportAccessTokenCommandTest extends TestCase
         $this->freezeTime();
 
         // Only an isolated in-memory DB is used; do not migrate or connect to the application's DB.
-        Schema::create('users', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->integer('status')->default(SituationStatusEnum::ACTIVE->value);
-            $table->softDeletes();
-        });
+        (require database_path('migrations/2024_12_24_000006_create_users_table.php'))->up();
         (require database_path('migrations/2026_08_22_000000_create_rdvpermis_tokens_table.php'))->up();
-        // The existing local DB uses the model's inferred table name, unlike the old migration.
-        // Adapt only this memory fixture; do not alter the application model or real DB.
-        Schema::rename('rdvpermis_tokens', (new RdvPermisToken)->getTable());
-        DB::table('users')->insert([['id' => '1'], ['id' => '2']]);
+        DB::table('users')->insert(array_map(fn ($id) => [
+            'id' => $id, 'first_name' => 'Fixture', 'last_name' => 'User', 'name' => 'Fixture User',
+            'email' => 'fixture'.$id.'@example.test', 'password' => 'fixture',
+        ], [1, 2]));
     }
 
     protected function tearDown(): void

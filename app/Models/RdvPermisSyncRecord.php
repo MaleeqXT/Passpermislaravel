@@ -9,9 +9,12 @@ class RdvPermisSyncRecord extends Model
 {
     use HasUuids;
 
+    protected $table = 'rdvpermis_sync_records';
+
     protected $guarded = [];
 
     protected $casts = [
+        'provider_context' => 'array',
         'synced_at' => 'datetime',
         'last_sync_attempt_at' => 'datetime',
     ];

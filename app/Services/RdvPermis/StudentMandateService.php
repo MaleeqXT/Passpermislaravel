@@ -18,7 +18,7 @@ class StudentMandateService
     ) {}
 
     /**
-     * @return array{nom:string, numeroDossier:string, email:string, groupePermis:string}
+     * @return array{nom:string, numeroDossier:string, email?:string, groupePermis:string}
      */
     public function payloadFor(Student $student): array
     {
@@ -33,19 +33,23 @@ class StudentMandateService
             throw new InvalidArgumentException('Le numéro de dossier NEPH est requis avant la synchronisation RdvPermis.');
         }
 
-        if (! filled($user->email) || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+        if (filled($user->email) && ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Une adresse e-mail valide est requise avant la synchronisation RdvPermis.');
         }
 
-        return [
+        $payload = [
             'nom' => trim((string) $user->last_name),
             // Do not convert to an integer: the government contract requires a string.
             'numeroDossier' => (string) $student->neph,
-            'email' => trim((string) $user->email),
             // PassPermis currently handles category-B candidates. Transmission
             // type (students.boite_type) is intentionally unrelated here.
             'groupePermis' => self::GROUPE_PERMIS,
         ];
+        if (filled($user->email)) {
+            $payload['email'] = trim((string) $user->email);
+        }
+
+        return $payload;
     }
 
     public function synchronize(User $actor, Student $student): Response
@@ -59,7 +63,16 @@ class StudentMandateService
             $response = $this->autoEcole->createMandate($actor, $payload);
             $mandateId = $response->json('id');
 
-            $this->sync->markSynced($record, filled($mandateId) ? (string) $mandateId : null);
+            $this->sync->markSynced($record, filled($mandateId) ? (string) $mandateId : null, [
+                'remote_candidate_id' => $response->json('candidatId'),
+                'permit_group' => $response->json('groupePermis') ?? $payload['groupePermis'],
+                'remote_school_id' => $response->json('autoEcole.id'),
+                'provider_context' => [
+                    'environment' => config('rdvpermis.environment'),
+                    'api_url' => config('rdvpermis.api_url'),
+                    'actor_user_id' => (string) $actor->getKey(),
+                ],
+            ]);
 
             return $response;
         } catch (Throwable $exception) {

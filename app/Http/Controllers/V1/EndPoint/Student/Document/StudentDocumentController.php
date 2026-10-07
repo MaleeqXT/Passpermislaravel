@@ -15,13 +15,23 @@ class StudentDocumentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $student = $this->student($request); $documents = $this->documentsFor($student); $required = $this->requiredFor($student);
+        $student = $this->student($request);
+        $documents = $this->documentsFor($student);
+        $contract = $student->canViewContract() ? $this->contractDocument($student) : null;
+
+        if ($contract) {
+            array_unshift($documents, $contract);
+        }
+
+        $required = $this->requiredFor($student);
         return response()->json(['summary' => [
             'total' => count($documents),
             'valid' => count(array_filter($documents, fn ($d) => $d['status'] === 'valid')),
             'pending' => count(array_filter($documents, fn ($d) => $d['status'] === 'pending')) + count(array_filter($required, fn ($d) => $d['state'] === 'pending')),
             'expiring' => count(array_filter($documents, fn ($d) => $d['status'] === 'expiring')),
-        ], 'documents' => array_map(fn ($document) => $this->publicDocument($document), $documents), 'required_documents' => $required]);
+        ], 'documents' => array_map(fn ($document) => $this->publicDocument($document), $documents), 'required_documents' => $required, 'contract' => [
+            'available' => (bool) $contract,
+        ]]);
     }
 
     public function store(Request $request): JsonResponse
@@ -127,6 +137,29 @@ class StudentDocumentController extends Controller
     {
         $expires = $expiresAt ? Carbon::parse($expiresAt) : null; $category = $this->category($title);
         return ['id'=>$id, 'title'=>$title, 'category'=>$category, 'type'=>strtoupper(str_replace('image/', '', $type ?: pathinfo($path, PATHINFO_EXTENSION) ?: 'file')), 'added_at'=>$addedAt ? Carbon::parse($addedAt)->format('d/m/Y') : '—', 'status'=>$status, 'status_label'=>$status === 'valid' ? 'À jour' : ($status === 'expiring' ? 'Expirant bientôt' : 'En attente'), 'tone'=>$status === 'valid' ? 'green' : 'amber', 'icon'=>$this->icon($category), 'iconTone'=>$status === 'valid' ? 'green' : 'amber', 'expires_at'=>$expires?->toDateString(), 'expiresAt'=>$expires?->format('d/m/Y'), 'warning'=>$status === 'expiring', 'download_url'=>"/student/documents/{$id}/download", 'downloadable'=>Storage::disk($disk)->exists($path), 'storage_path'=>$path, 'storage_disk'=>$disk, 'filename'=>$filename];
+    }
+
+    private function contractDocument(Student $student): array
+    {
+        return [
+            'id' => 'formation-contract',
+            'title' => 'Contrat de formation',
+            'category' => 'Administratif',
+            'type' => 'PDF',
+            'added_at' => $student->created_at?->format('d/m/Y') ?? '—',
+            'status' => 'valid',
+            'status_label' => 'À jour',
+            'tone' => 'green',
+            'icon' => 'file',
+            'iconTone' => 'green',
+            'expires_at' => null,
+            'expiresAt' => null,
+            'warning' => false,
+            'download_url' => "/students/{$student->id}/contract",
+            'downloadable' => true,
+            'deletable' => false,
+            'contract' => true,
+        ];
     }
 
     private function approvedReviewFor($reviews, string $documentType): ?StudentDocument

@@ -13,6 +13,7 @@ class RdvPermisApiException extends RuntimeException
         ?Throwable $previous = null,
         public readonly ?int $rdvPermisStatus = null,
         public readonly ?string $rdvPermisError = null,
+        public readonly ?int $retryAfter = null,
     ) {
         parent::__construct($userMessage, 0, $previous);
     }

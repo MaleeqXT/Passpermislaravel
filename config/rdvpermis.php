@@ -1,6 +1,7 @@
 <?php
 
 return [
+    // This label never selects URLs. Configure auth/token/API URLs together per environment.
     'environment' => env('RDVPERMIS_ENV', 'recette1'),
     'client_id' => env('RDVPERMIS_CLIENT_ID'),
     'client_secret' => env('RDVPERMIS_CLIENT_SECRET'),
@@ -16,7 +17,6 @@ return [
         'RDVPERMIS_API_URL',
         'https://api.integediteurs.rdv-permis.interieur.gouv.fr'
     ),
-    'current_school_path' => env('RDVPERMIS_CURRENT_SCHOOL_PATH', '/api/v2/auto-ecole/moi'),
     'redirect_uri' => env('RDVPERMIS_REDIRECT_URI'),
     'frontend_callback_url' => env('RDVPERMIS_FRONTEND_CALLBACK_URL'),
     'scopes' => array_values(array_filter(explode(' ', env(
@@ -24,5 +24,8 @@ return [
         'rdvpermis livret_numerique:read livret_numerique:write offline_access'
     )))),
     'state_ttl_minutes' => (int) env('RDVPERMIS_STATE_TTL_MINUTES', 10),
+    // Use a shared store between workers; database and Redis support distributed locks.
+    'cache_store' => env('RDVPERMIS_CACHE_STORE'),
+    'refresh_lock_wait_seconds' => 2,
     'timeout' => (int) env('RDVPERMIS_TIMEOUT', 20),
 ];

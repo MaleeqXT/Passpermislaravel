@@ -9,10 +9,11 @@ use App\Services\RdvPermis\StudentMandateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
-use RuntimeException;
 
 class StudentMandateController extends Controller
 {
+    use HandlesRdvPermisErrors;
+
     public function store(Request $request, Student $student, StudentMandateService $mandates): JsonResponse
     {
         try {
@@ -32,9 +33,9 @@ class StudentMandateController extends Controller
                 }
             }
 
-            return response()->json($body, $exception->responseStatus);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 401);
+            return $this->providerError($exception, array_diff_key($body, ['message' => true]));
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
         }
     }
 }

@@ -14,6 +14,11 @@ class RdvPermisOAuthCallbackTest extends TestCase
     {
         parent::setUp();
 
+        config()->set('database.default', 'sqlite');
+        config()->set('database.connections.sqlite.database', ':memory:');
+        \Illuminate\Support\Facades\DB::purge('sqlite');
+        \Illuminate\Support\Facades\Log::spy();
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
         config()->set('rdvpermis.frontend_callback_url', 'https://reactfast.passpermisfacile.fr/');
     }
 

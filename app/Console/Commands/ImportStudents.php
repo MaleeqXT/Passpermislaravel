@@ -54,7 +54,7 @@ class ImportStudents extends Command
                 ]);
 
                 $user->student()->create([
-                    'neph' => (int)$neph,
+                    'neph' => $neph === '' ? null : (string) $neph,
                 ]);
                 $user->assignRole(UserRolesEnum::STUDENT->value);
 

@@ -8,10 +8,11 @@ use App\Services\RdvPermis\PanierService;
 use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
 
 class PanierController extends Controller
 {
+    use HandlesRdvPermisErrors;
+
     public function index(Request $request, PanierService $paniers): JsonResponse
     {
         return $this->respond(fn () => $paniers->all($request->user()));
@@ -83,12 +84,14 @@ class PanierController extends Controller
             'candidatId' => ['present', 'nullable', 'string'],
         ]);
 
-        return $this->respond(fn () => $paniers->assignCandidate(
-            $request->user(),
-            $panierId,
-            $creneauId,
-            $validated['candidatId'],
-        ));
+        return $this->respond(function () use ($request, $paniers, $panierId, $creneauId, $validated) {
+            if ($validated['candidatId'] !== null) {
+                app(\App\Services\RdvPermis\CandidateEligibilityService::class)
+                    ->requireEligible($request->user(), $creneauId, $validated['candidatId']);
+            }
+            // Eligibility may change between requests; assignment remains provider-authoritative.
+            return $paniers->assignCandidate($request->user(), $panierId, $creneauId, $validated['candidatId']);
+        });
     }
 
     /** @param callable(): ClientResponse $operation */
@@ -104,9 +107,9 @@ class PanierController extends Controller
 
             return response()->json($response->json(), $response->status(), $headers);
         } catch (RdvPermisApiException $exception) {
-            return response()->json(['message' => $exception->userMessage], $exception->responseStatus);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 401);
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
         }
     }
 }
