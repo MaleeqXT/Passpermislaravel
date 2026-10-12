@@ -17,6 +17,10 @@ class Wallet extends Model
 
     protected static $unguarded = true;
 
+    protected $casts = [
+        'balance_minutes' => 'integer',
+    ];
+
     protected static function newFactory()
     {
         return WalletFactory::new();

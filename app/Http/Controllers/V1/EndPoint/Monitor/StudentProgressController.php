@@ -13,6 +13,7 @@ use App\Models\Roles\Student\User\Student;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StudentProgressController extends Controller
 {
@@ -27,7 +28,7 @@ class StudentProgressController extends Controller
         $reservations = Reservation::query()
             ->where('monitor_id', $monitor->id)
             ->whereHas('training', fn ($query) => $query->where('student_id', $student->id))
-            ->with(['training.offer', 'monitor.user'])
+            ->with(['training.offer', 'monitor.user', 'evaluation'])
             ->orderByDesc('date')
             ->orderByDesc('start_at')
             ->get();
@@ -94,6 +95,14 @@ class StudentProgressController extends Controller
                 ];
             });
 
+        // A manoeuvre belongs to the candidate's driving history. It must remain visible
+        // when a candidate changes monitor, while the lesson and competency sections
+        // below remain scoped to the current monitor.
+        $maneuverReservations = Reservation::query()
+            ->whereHas('training', fn ($query) => $query->where('student_id', $student->id))
+            ->with('evaluation')
+            ->get();
+
         $plannedMinutes = $reservations->sum(fn ($reservation) => $this->minutes($reservation));
         $completedMinutes = $reservations
             ->filter(fn ($reservation) => $this->isCompleted($reservation))
@@ -110,6 +119,7 @@ class StudentProgressController extends Controller
                 ],
                 'overallPercentage' => $totalQuestions ? (int) round(($levelTotal / ($totalQuestions * 5)) * 100) : 0,
                 'competencies' => $competencies->all(),
+                'maneuverCounts' => $this->maneuverCounts($maneuverReservations),
                 'hours' => [
                     'plannedMinutes' => $plannedMinutes,
                     'completedMinutes' => $completedMinutes,
@@ -180,27 +190,32 @@ class StudentProgressController extends Controller
             return response()->json(['message' => 'Aucune leçon disponible pour enregistrer cette évaluation.'], 422);
         }
 
-        $rating = Rating::query()->updateOrCreate(
-            [
-                'competency_id' => $competency->id,
-                'student_id' => $student->id,
-                'monitor_id' => $monitor->id,
-                'reservation_id' => $reservation->id,
-            ],
-            [
-                'rating' => $validated['rating'],
-                'comment' => $validated['observations'] ?? null,
-            ],
-        );
+        DB::transaction(function () use ($reservation, $student, $monitor, $competency, $validated) {
+            $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            abort_if(isset($reservation->evaluation?->data['formation_signature']), 423, 'Cette leçon est signée et ne peut plus être modifiée.');
 
-        CompetencyEvaluationDetail::query()->updateOrCreate(
-            ['rating_id' => $rating->id],
-            [
-                'student_evaluation' => $validated['student_evaluation'] ?? false,
-                'student_response' => $validated['student_response'] ?? null,
-                'active_tab' => $validated['active_tab'] ?? 'pourquoi',
-            ],
-        );
+            $rating = Rating::query()->updateOrCreate(
+                [
+                    'competency_id' => $competency->id,
+                    'student_id' => $student->id,
+                    'monitor_id' => $monitor->id,
+                    'reservation_id' => $reservation->id,
+                ],
+                [
+                    'rating' => $validated['rating'],
+                    'comment' => $validated['observations'] ?? null,
+                ],
+            );
+
+            CompetencyEvaluationDetail::query()->updateOrCreate(
+                ['rating_id' => $rating->id],
+                [
+                    'student_evaluation' => $validated['student_evaluation'] ?? false,
+                    'student_response' => $validated['student_response'] ?? null,
+                    'active_tab' => $validated['active_tab'] ?? 'pourquoi',
+                ],
+            );
+        });
 
         return $this->show($request, $student);
     }
@@ -220,6 +235,22 @@ class StudentProgressController extends Controller
         return $monitor;
     }
 
+    private function maneuverCounts($reservations): array
+    {
+        return $reservations->reduce(function (array $totals, Reservation $reservation): array {
+            $data = is_array($reservation->evaluation?->data) ? $reservation->evaluation->data : [];
+            $counts = $data['formation']['maneuver_counts'] ?? [];
+
+            foreach ((array) $counts as $id => $count) {
+                $amount = max(0, (int) $count);
+                if ($amount > 0) {
+                    $totals[(string) $id] = ($totals[(string) $id] ?? 0) + $amount;
+                }
+            }
+
+            return $totals;
+        }, []);
+    }
     private function minutes(Reservation $reservation): int
     {
         if ($reservation->start_at && $reservation->end_at) {

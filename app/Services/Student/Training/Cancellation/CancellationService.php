@@ -14,6 +14,7 @@ use App\Repository\V2\Student\Schedule\Training\Cancellation\FetchCanceledTraini
 use App\Repository\V2\Student\Schedule\Training\Cancellation\StoreCancellationRepo;
 use App\Repository\V2\Student\Schedule\Training\Job\DestroyTrainingRepo;
 use App\Repository\V2\Student\Schedule\Training\Wallet\IncOrDecWalletRepo;
+use App\Services\Student\Training\FormationWalletMinutesService;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -76,7 +77,7 @@ class CancellationService implements CancellationInterface
     {
         $training = Training::query()->findOrFail($trainingId);
         DestroyReviewRepo::run($training->reservation);
-        IncOrDecWalletRepo::run($training->student, $training->offer_id, 'inc', $training->reservation?->hour ?? 1);
+        $this->refundLessonDuration($training);
 
         $this->sendCancellationEmails($training);
         DestroyTrainingRepo::run($trainingId);
@@ -198,7 +199,7 @@ class CancellationService implements CancellationInterface
         // }
         $this->sendCancellationEmails($training);
 
-        IncOrDecWalletRepo::run($training?->student, $training->offer_id, 'inc', $training?->reservation?->hour);
+        $this->refundLessonDuration($training);
 
         $cancellation->training()->delete();
     }
@@ -212,13 +213,25 @@ class CancellationService implements CancellationInterface
      */
     public function CancellationTraining(Training $training): bool
     {
-        IncOrDecWalletRepo::run($training->student, $training->offer_id, 'inc', $training->reservation->hour);
+        $this->refundLessonDuration($training);
         $this->sendCancellationEmails($training);
 
         DestroyTrainingRepo::run($training);
         session()->flash('success', "Annulation de la session confirmée.");
         return true;
     }
+    /** Refund an exact Formation duration when this reservation has one. */
+    private function refundLessonDuration(Training $training): void
+    {
+        $minutes = $training->reservation?->duration_minutes;
+        if ($minutes !== null) {
+            app(FormationWalletMinutesService::class)->credit($training->student, $training->offer_id, (int) $minutes);
+            return;
+        }
+
+        IncOrDecWalletRepo::run($training->student, $training->offer_id, 'inc', $training->reservation?->hour ?? 1);
+    }
+
     protected function sendNotificationSafely(string $email, object $notification, string $context): void
     {
         try {

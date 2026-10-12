@@ -22,6 +22,7 @@ use App\Repository\V2\Student\Schedule\Training\Job\StoreTrainingRepo;
 use App\Repository\V2\Student\Schedule\Training\Job\StudentInTrainingRepo;
 use App\Repository\V2\Student\Schedule\Training\Wallet\FetchWalletRepo;
 use App\Repository\V2\Student\Schedule\Training\Wallet\IncOrDecWalletRepo;
+use App\Services\Student\Training\FormationWalletMinutesService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
@@ -77,9 +78,16 @@ class TrainingService implements TrainingInterface
     {
         $attributes['student_id'] = $attributes['student_id'] ?? auth()->user()->student->id;
 
-        $this->validateStudentWallet($attributes['student_id'], $attributes['offer_id'], $reservation->hour);
-
-        IncOrDecWalletRepo::run($attributes['student_id'], $attributes['offer_id'], WalletStatusEnum::DECREMENT->value, $reservation->hour);
+        if (array_key_exists('duration_minutes', $attributes)) {
+            app(FormationWalletMinutesService::class)->debit(
+                Student::query()->findOrFail($attributes['student_id']),
+                $attributes['offer_id'],
+                (int) $attributes['duration_minutes'],
+            );
+        } else {
+            $this->validateStudentWallet($attributes['student_id'], $attributes['offer_id'], $reservation->hour);
+            IncOrDecWalletRepo::run($attributes['student_id'], $attributes['offer_id'], WalletStatusEnum::DECREMENT->value, $reservation->hour);
+        }
 
         $attributes['reservation_id'] = $reservation->id;
 

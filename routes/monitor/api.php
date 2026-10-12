@@ -6,6 +6,7 @@ use App\Http\Controllers\V1\EndPoint\Monitor\Reservation\MonitorCancellationCont
 use App\Http\Controllers\V1\EndPoint\Monitor\Reservation\ReservationMonitorController;
 use App\Http\Controllers\V1\EndPoint\Student\Info\ListStudentByMonitorController;
 use App\Http\Controllers\V1\EndPoint\Monitor\StudentProgressController;
+use App\Http\Controllers\V1\EndPoint\Monitor\FormationController;
 use App\Http\Controllers\V1\EndPoint\Bilan\BilanController;
 use App\Http\Controllers\V1\EndPoint\Student\Proposition\ProposalTrainingController;
 use Illuminate\Support\Facades\Route;
@@ -87,6 +88,23 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             Route::get('/', 'getAllEleves')->name('index');
             Route::put('/{student}/update', 'updateEleve')->name('update');
         });
+
+    Route::prefix('formation/{student}')->name('formation.')->controller(FormationController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/livret', 'sendBooklet')->name('booklet.send');
+        Route::get('/livret/download', 'downloadBooklet')->name('booklet.download');
+        Route::get('/initial-evaluation', 'initialEvaluation')->name('initial-evaluation.show');
+        Route::put('/initial-evaluation', 'updateInitialEvaluation')->name('initial-evaluation.update');
+        Route::get('/initial-evaluation/contract', 'initialEvaluationContract')->name('initial-evaluation.contract');
+        Route::get('/initial-evaluation/questions', 'initialEvaluationQuestions')->name('initial-evaluation.questions.show');
+        Route::put('/initial-evaluation/questions', 'updateInitialEvaluationQuestions')->name('initial-evaluation.questions.update');
+        Route::get('/{reservation}/schema', 'schema')->name('schema.show');
+        Route::put('/{reservation}/schema', 'updateSchema')->name('schema.update');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{reservation}', 'update')->name('update');
+        Route::delete('/{reservation}', 'destroy')->name('destroy');
+        Route::post('/{reservation}/sign', 'sign')->name('sign');
+    });
 
     Route::prefix('bilans')->name('bilans.')
         ->controller(BilanController::class)->group(function () {

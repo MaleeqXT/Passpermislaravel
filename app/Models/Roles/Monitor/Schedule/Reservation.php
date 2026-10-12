@@ -28,7 +28,8 @@ class Reservation extends Model
     protected $casts = [
         'date' => 'date:Y-m-d',
         'start_at' => 'datetime:H:i',
-        'end_at' => 'datetime:H:i'
+        'end_at' => 'datetime:H:i',
+        'duration_minutes' => 'integer'
         // 'is_active' => 'boolean',
     ];
 

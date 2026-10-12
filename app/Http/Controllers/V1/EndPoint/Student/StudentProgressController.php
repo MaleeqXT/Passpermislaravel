@@ -24,7 +24,7 @@ class StudentProgressController extends Controller
 
         $reservations = Reservation::query()
             ->whereHas('training', fn ($query) => $query->where('student_id', $student->id))
-            ->with(['training.offer', 'monitor.user'])
+            ->with(['training.offer', 'monitor.user', 'evaluation'])
             ->orderByDesc('date')
             ->orderByDesc('start_at')
             ->get();
@@ -102,6 +102,7 @@ class StudentProgressController extends Controller
             ],
             'overallPercentage' => $totalQuestions ? (int) round(($levelTotal / ($totalQuestions * 5)) * 100) : 0,
             'competencies' => $competencies->all(),
+            'maneuverCounts' => $this->maneuverCounts($reservations),
             'hours' => [
                 'plannedMinutes' => $plannedMinutes,
                 'completedMinutes' => $completedMinutes,
@@ -221,10 +222,6 @@ class StudentProgressController extends Controller
             'publicObservation' => $evaluationData['public_observations']
                 ?? $reservation->latestComment?->comment
                 ?? null,
-            'teacherObservation' => $evaluationData['teacher_observations']
-                ?? $evaluationData['observations_enseignant']
-                ?? $reservation->reviewMonitor?->comment
-                ?? null,
             'isAbsent' => (bool) $reservation->reviewMonitor?->is_absent,
         ]]);
     }
@@ -268,6 +265,22 @@ class StudentProgressController extends Controller
         ];
     }
 
+    private function maneuverCounts($reservations): array
+    {
+        return $reservations->reduce(function (array $totals, Reservation $reservation): array {
+            $data = is_array($reservation->evaluation?->data) ? $reservation->evaluation->data : [];
+            $counts = $data['formation']['maneuver_counts'] ?? [];
+
+            foreach ((array) $counts as $id => $count) {
+                $amount = max(0, (int) $count);
+                if ($amount > 0) {
+                    $totals[(string) $id] = ($totals[(string) $id] ?? 0) + $amount;
+                }
+            }
+
+            return $totals;
+        }, []);
+    }
     private function minutes(Reservation $reservation): int
     {
         if ($reservation->start_at && $reservation->end_at) {

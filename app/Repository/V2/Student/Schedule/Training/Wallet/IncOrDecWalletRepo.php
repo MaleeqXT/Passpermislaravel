@@ -104,6 +104,10 @@ class IncOrDecWalletRepo
             'status' => WalletTypeEnum::ACTIVE->value
         ];
 
+        if (Schema::hasColumn('wallets', 'balance_minutes')) {
+            $walletData['balance_minutes'] = max($value, 0) * 60;
+        }
+
         // Add balance_type if column exists
         if (Schema::hasColumn('wallets', 'balance_type')) {
             $walletData['balance_type'] = WalletBalanceTypeEnum::FULL->value;
@@ -122,6 +126,13 @@ class IncOrDecWalletRepo
     private static function updateWalletBalance(Wallet $wallet, int $value): void
     {
         $newBalance = max(intval($wallet->balance ?? 0) + $value, 0);
-        $wallet->update(['balance' => $newBalance]);
+        $attributes = ['balance' => $newBalance];
+
+        if (Schema::hasColumn('wallets', 'balance_minutes')) {
+            $currentMinutes = $wallet->balance_minutes ?? ((int) ($wallet->balance ?? 0) * 60);
+            $attributes['balance_minutes'] = max((int) $currentMinutes + ($value * 60), 0);
+        }
+
+        $wallet->update($attributes);
     }
 }

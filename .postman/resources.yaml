@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: c882884f-cf53-4196-900b-6584f3687846
+
+localResources:
+  collections:
+    - ../RDVPermis_RECETTE1.postman_collection.json

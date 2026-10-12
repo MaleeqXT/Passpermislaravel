@@ -17,6 +17,7 @@ use App\Http\Controllers\V1\EndPoint\Student\Document\StudentDocumentController;
 use App\Http\Controllers\SatisfactionController;
 use App\Http\Controllers\V1\EndPoint\Student\Exam\StudentExamController;
 use App\Http\Controllers\V1\EndPoint\Student\StudentProgressController;
+use App\Http\Controllers\V1\EndPoint\Student\StudentFormationController;
 use App\Http\Controllers\V1\EndPoint\Bilan\BilanController;
 
 
@@ -36,6 +37,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/progress', [StudentProgressController::class, 'show'])->name('student.progress.show');
     Route::get('/progress/lessons/{reservation}', [StudentProgressController::class, 'lessonDetail'])->name('student.progress.lessons.show');
     Route::get('/bilans', [BilanController::class, 'showForStudent'])->name('student.bilans.show');
+    Route::prefix('formation')->controller(StudentFormationController::class)->group(function () {
+        Route::get('/', 'index')->name('student.formation.index');
+        Route::get('/lessons/{reservation}/schema', 'schema')->name('student.formation.schema');
+        Route::put('/lessons/{reservation}/schema', 'updateSchema')->name('student.formation.schema.update');
+        Route::post('/booklet', 'sendBooklet')->middleware('throttle:3,1')->name('student.formation.booklet.send');
+    });
     Route::put('/progress/competencies/{competency}/comment', [StudentProgressController::class, 'updateStudentComment'])
         ->name('student.progress.competencies.comment.update');
 

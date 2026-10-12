@@ -1,0 +1,20 @@
+$kind: http-request
+method: POST
+url: '{{base_url}}/api/auth/logout'
+order: 3000
+headers:
+  - key: Accept
+    value: application/json
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{auth_token}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      if (pm.response.code === 200) {
+          pm.environment.set('auth_token', '');
+          console.log('auth_token cleared from environment.');
+      }
