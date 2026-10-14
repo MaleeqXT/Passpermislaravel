@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="title desc">
+  <title id="title">Angle mort droit</title><desc id="desc">Schéma original d'une voiture prête à tourner à droite avec un cycliste dans l'angle mort.</desc>
+  <rect width="800" height="480" fill="#e9f6fa"/><path d="M0 170h800v150H0zM505 0h160v480H505z" fill="#59656d"/><path d="M0 245h505M585 0v480" stroke="#fff" stroke-width="7" stroke-dasharray="28 24"/>
+  <g fill="#357dc0"><rect x="215" y="205" width="150" height="70" rx="14"/><rect x="242" y="178" width="85" height="45" rx="12" fill="#b7e5f7"/><circle cx="255" cy="285" r="17" fill="#22313b"/><circle cx="325" cy="285" r="17" fill="#22313b"/></g>
+  <path d="M365 225c80-20 124-4 180 66l-116 0z" fill="#ffce48" opacity=".68"/><text x="446" y="257" text-anchor="middle" font-family="Arial" font-size="22" font-weight="700" fill="#263841">angle mort</text>
+  <g stroke="#25333b" stroke-width="8" fill="none"><circle cx="510" cy="327" r="27"/><circle cx="580" cy="327" r="27"/><path d="M510 327l33-62 37 62m-37-62-34 0m34 0 10-35m-10 35-35-37"/></g><circle cx="553" cy="183" r="18" fill="#f3bd90"/><path d="M553 202l-10 56m10-46 26 26" stroke="#d85a48" stroke-width="12" stroke-linecap="round"/>
+  <path d="M365 206c72 20 104 69 118 116" stroke="#ff805a" stroke-width="9" fill="none" marker-end="url(#arrow)"/><text x="32" y="58" font-family="Arial" font-size="25" font-weight="700" fill="#263841">Avant de tourner : rétro + contrôle direct à droite.</text>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z" fill="#ff805a"/></marker></defs>
+</svg>

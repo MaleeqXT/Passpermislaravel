@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="title desc">
+  <title id="title">Distance de sécurité</title><desc id="desc">Deux voitures sur une route avec une zone de distance de sécurité.</desc>
+  <rect width="800" height="480" fill="#dff0ff"/><path d="M0 155h800v185H0z" fill="#53616c"/><path d="M0 247h800" stroke="#fff" stroke-width="8" stroke-dasharray="32 24"/>
+  <g fill="#2e79c2"><rect x="95" y="203" width="130" height="60" rx="13"/><rect x="122" y="178" width="76" height="42" rx="10" fill="#aee4f7"/><circle cx="125" cy="272" r="16" fill="#1d2930"/><circle cx="195" cy="272" r="16" fill="#1d2930"/></g>
+  <g fill="#d65950"><rect x="570" y="203" width="130" height="60" rx="13"/><rect x="597" y="178" width="76" height="42" rx="10" fill="#aee4f7"/><circle cx="600" cy="272" r="16" fill="#1d2930"/><circle cx="670" cy="272" r="16" fill="#1d2930"/></g>
+  <path d="M250 305h300" stroke="#ffd653" stroke-width="8" stroke-dasharray="10 8"/><path d="M250 305l26-14v28zM550 305l-26-14v28z" fill="#ffd653"/>
+  <text x="400" y="357" text-anchor="middle" font-family="Arial" font-size="26" font-weight="700" fill="#263841">Je garde une marge pour réagir et freiner</text>
+  <text x="36" y="60" font-family="Arial" font-size="25" font-weight="700" fill="#263841">Une distance adaptée protège tous les usagers.</text>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="title desc">
+  <title id="title">Dépassement d'un cycliste</title><desc id="desc">Schéma original montrant une voiture qui laisse un espace latéral à un cycliste.</desc>
+  <rect width="800" height="480" fill="#e6f2df"/><rect y="130" width="800" height="250" fill="#59656d"/><path d="M400 130v250" stroke="#fff" stroke-width="7" stroke-dasharray="28 24"/>
+  <g><rect x="170" y="214" width="150" height="72" rx="15" fill="#2e78c2"/><rect x="198" y="185" width="87" height="45" rx="12" fill="#b6e4f8"/><circle cx="210" cy="294" r="18"/><circle cx="280" cy="294" r="18"/></g>
+  <g stroke="#24333b" stroke-width="10" fill="none"><circle cx="620" cy="292" r="35"/><circle cx="705" cy="292" r="35"/><path d="M620 292l39-75 46 75m-46-75-42 0m42 0 14-43m-14 43-45-45"/></g><circle cx="671" cy="120" r="21" fill="#f3bd90"/><path d="M670 142l-16 72m16-60 31 30" stroke="#d85645" stroke-width="14" stroke-linecap="round"/>
+  <path d="M345 335h190" stroke="#ffd34f" stroke-width="9"/><path d="M345 335l22-13v26zM535 335l-22-13v26z" fill="#ffd34f"/><text x="440" y="322" text-anchor="middle" font-family="Arial" font-size="28" font-weight="700" fill="#fff">1 m minimum en agglomération</text>
+  <text x="32" y="60" font-family="Arial" font-size="25" font-weight="700" fill="#263841">Je dépasse sans serrer le cycliste.</text>
+</svg>

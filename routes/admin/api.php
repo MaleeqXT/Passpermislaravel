@@ -26,6 +26,9 @@ use App\Http\Controllers\V1\EndPoint\Schools\SchoolController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SatisfactionController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\Theory\TheoryAdminController;
+use App\Http\Controllers\Theory\TheoryAdminSeriesController;
+use App\Http\Controllers\Theory\TheoryManualCodeAccessController;
 use App\Http\Controllers\V1\Inertia\CPF\CPFPagesController;
 
 use App\Http\Controllers\V1\Inertia\System\User\AdminUserController;
@@ -77,6 +80,34 @@ Route::prefix('locations')->name('locations.')
 });
 
 Route::middleware(['auth:sanctum', 'role:admin|secretary', config('jetstream.auth_session'), 'verified', 'slow'])->group(function () {
+      Route::prefix('theory')->controller(TheoryAdminController::class)->group(function () {
+          Route::get('/categories', 'categories');
+          Route::get('/statistics', 'statistics');
+          Route::get('/duplicates', 'duplicates');
+          Route::get('/questions', 'index');
+          Route::post('/questions', 'store');
+          Route::put('/questions/{question}', 'update');
+          Route::patch('/questions/{question}/publication', 'updatePublication');
+          Route::post('/questions/{question}/media', 'uploadMedia');
+          Route::delete('/questions/{question}', 'destroy');
+      });
+
+      Route::prefix('theory')->controller(TheoryAdminSeriesController::class)->group(function () {
+          Route::get('/series', 'index');
+          Route::post('/series', 'store');
+          Route::get('/question-bank', 'questionBank');
+          Route::get('/series/{series}', 'show');
+          Route::put('/series/{series}', 'update');
+          Route::put('/series/{series}/questions', 'replaceQuestions');
+          Route::patch('/series/{series}/publication', 'updatePublication');
+      });
+
+      Route::prefix('theory')->controller(TheoryManualCodeAccessController::class)->group(function () {
+          Route::get('/accesses', 'index');
+          Route::patch('/accesses/{student}', 'grant');
+          Route::delete('/accesses/{student}', 'revoke');
+      });
+
       Route::prefix('student-documents')->controller(AdminStudentDocumentController::class)->group(function () {
           Route::get('/', 'index');
           Route::get('/{student}', 'show');

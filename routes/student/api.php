@@ -19,6 +19,7 @@ use App\Http\Controllers\V1\EndPoint\Student\Exam\StudentExamController;
 use App\Http\Controllers\V1\EndPoint\Student\StudentProgressController;
 use App\Http\Controllers\V1\EndPoint\Student\StudentFormationController;
 use App\Http\Controllers\V1\EndPoint\Bilan\BilanController;
+use App\Http\Controllers\Theory\TheoryStudentController;
 
 
 /*
@@ -33,6 +34,16 @@ use App\Http\Controllers\V1\EndPoint\Bilan\BilanController;
 */
 
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'slow'])->group(function () {
+    Route::prefix('theory')->controller(TheoryStudentController::class)->group(function () {
+        Route::get('/access', 'access');
+        Route::get('/dashboard', 'dashboard');
+        Route::post('/attempts', 'start');
+        Route::get('/attempts/{attempt}', 'show');
+        Route::put('/attempts/{attempt}/answers/{answer}', 'saveAnswer');
+        Route::post('/attempts/{attempt}/answers/{answer}/validate', 'validateTrainingAnswer');
+        Route::post('/attempts/{attempt}/submit', 'submit');
+    });
+
     Route::get('/exams', [StudentExamController::class, 'index'])->name('student.exams.index');
     Route::get('/progress', [StudentProgressController::class, 'show'])->name('student.progress.show');
     Route::get('/progress/lessons/{reservation}', [StudentProgressController::class, 'lessonDetail'])->name('student.progress.lessons.show');

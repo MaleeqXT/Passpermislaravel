@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="title desc">
+  <title id="title">Passage pour piétons</title><desc id="desc">Schéma original d'une voiture approchant un passage pour piétons avec un piéton.</desc>
+  <rect width="800" height="480" fill="#eaf5e7"/><rect y="155" width="800" height="200" fill="#56616a"/>
+  <g fill="#fff"><path d="M270 170h42l-22 170h-42z"/><path d="M340 170h42l-22 170h-42z"/><path d="M410 170h42l-22 170h-42z"/><path d="M480 170h42l-22 170h-42z"/></g>
+  <rect x="86" y="236" width="150" height="72" rx="16" fill="#2c72be"/><rect x="114" y="208" width="85" height="45" rx="12" fill="#a9dcf5"/><circle cx="120" cy="315" r="19"/><circle cx="200" cy="315" r="19"/>
+  <circle cx="585" cy="170" r="24" fill="#fdc59a"/><path d="M585 195v76m0-50-35 34m35-34 35 34m-35 16-27 55m27-55 27 55" stroke="#283a45" stroke-width="15" stroke-linecap="round"/>
+  <path d="M255 272h120" stroke="#ffcc3c" stroke-width="12" marker-end="url(#arrow)"/><text x="35" y="60" font-family="Arial" font-size="25" font-weight="700" fill="#283a45">J'anticipe l'arrêt et je laisse traverser.</text>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z" fill="#ffcc3c"/></marker></defs>
+</svg>

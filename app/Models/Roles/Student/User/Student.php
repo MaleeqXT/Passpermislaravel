@@ -26,6 +26,7 @@ use App\Models\Roles\Admin\Offer\Cart\CartDetail;
 use App\Models\Roles\Admin\Offer\Offer;
 use App\Models\ReservationComment;
 use App\Models\Roles\Student\Exam\StudentExam;
+use App\Models\Theory\TheoryManualCodeAccess;
 
 
 
@@ -110,6 +111,12 @@ public function offers()
     public function sales(): HasMany
     {
         return $this->hasMany(Sale::class);
+    }
+
+    /** Cash / in-agency Code access granted by an admin or secretary. */
+    public function theoryManualAccesses(): HasMany
+    {
+        return $this->hasMany(TheoryManualCodeAccess::class, 'student_id');
     }
 
     /**

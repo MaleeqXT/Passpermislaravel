@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="title desc">
+  <title id="title">Carrefour avec priorité à droite</title><desc id="desc">Schéma original d'un véhicule approchant une intersection et d'un véhicule arrivant de droite.</desc>
+  <rect width="800" height="480" fill="#dff1ff"/>
+  <path d="M0 180h800v120H0zM340 0h120v480H340z" fill="#4c5964"/>
+  <path d="M0 235h800M400 0v480" stroke="#fff" stroke-width="8" stroke-dasharray="28 24"/>
+  <path d="M110 300h180" stroke="#ffd84a" stroke-width="12" marker-end="url(#arrow)"/>
+  <path d="M570 105v110" stroke="#ff805a" stroke-width="12" marker-end="url(#arrow2)"/>
+  <rect x="145" y="265" width="88" height="46" rx="10" fill="#2867b2"/><circle cx="170" cy="315" r="12"/><circle cx="210" cy="315" r="12"/>
+  <rect x="525" y="84" width="46" height="88" rx="10" fill="#d74848"/><circle cx="520" cy="105" r="12"/><circle cx="520" cy="145" r="12"/>
+  <circle cx="442" cy="220" r="34" fill="#fff" stroke="#ff805a" stroke-width="6"/><text x="442" y="231" text-anchor="middle" font-family="Arial" font-size="34" font-weight="700" fill="#25323a">?</text>
+  <text x="45" y="52" font-family="Arial" font-size="24" fill="#25323a" font-weight="700">Qui doit céder le passage ?</text>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z" fill="#ffd84a"/></marker><marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z" fill="#ff805a"/></marker></defs>
+</svg>

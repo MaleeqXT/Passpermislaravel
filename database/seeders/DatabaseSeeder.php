@@ -36,6 +36,8 @@ use Database\Seeders\Roles\Student\User\StudentSeeder;
 use Database\Seeders\Roles\Student\User\WalletSeeder;
 use Database\Seeders\User\UserSeeder;
 use Database\Seeders\User\UsersRolesTableSeeder;
+use Database\Seeders\Theory\TheoryQuestionSeeder;
+use Database\Seeders\Theory\TheorySeriesSeeder;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -59,6 +61,8 @@ class DatabaseSeeder extends Seeder
             MainCompetencySeeder::class,
             CompetencySeeder::class,
             SatisfactionSeeder::class,
+            TheoryQuestionSeeder::class,
+            TheorySeriesSeeder::class,
 
         ]);
 
