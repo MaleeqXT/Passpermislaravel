@@ -6,6 +6,8 @@ use App\Exceptions\RdvPermisApiException;
 use App\Models\User;
 use App\Services\RdvPermis\ApiClient;
 use App\Services\RdvPermis\TokenService;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Psr7\Request as Psr7Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\ConnectionException;
@@ -43,6 +45,68 @@ class RdvPermisApiClientTest extends TestCase
         Log::shouldHaveReceived('warning')->once()->with('RdvPermis API connection failure', Mockery::on(
             fn (array $context) => ! str_contains(json_encode($context), 'secret-token')
                 && ! str_contains(json_encode($context), 'secret-value')
+        ));
+    }
+
+    public function test_guzzle_request_exceptions_are_classified_as_safe_transport_failures(): void
+    {
+        Log::spy();
+        config()->set('rdvpermis.api_url', 'https://api.example.test');
+        Http::fake(fn () => throw new RequestException(
+            'cURL error 60: SSL certificate problem: Authorization: Bearer secret-token',
+            new Psr7Request('GET', 'https://api.example.test/api/v2/auto-ecole/moi'),
+            null,
+            null,
+            ['errno' => 60],
+        ));
+
+        $tokens = Mockery::mock(TokenService::class);
+        $tokens->shouldReceive('accessToken')->once()->andReturn('secret-token');
+
+        try {
+            (new ApiClient($tokens))->get((new User)->forceFill(['id' => 1]), '/api/v2/auto-ecole/moi');
+            $this->fail('A Guzzle transport failure must return a sanitized error.');
+        } catch (RdvPermisApiException $exception) {
+            $this->assertSame(503, $exception->responseStatus);
+            $this->assertStringNotContainsString('secret-token', $exception->getMessage());
+        }
+
+        Log::shouldHaveReceived('warning')->once()->with('RdvPermis API connection failure', Mockery::on(
+            fn (array $context) => $context['curl_errno'] === 60
+                && ! str_contains(json_encode($context), 'secret-token')
+        ));
+    }
+
+    public function test_provider_diagnostics_redact_candidate_personal_data_before_logging(): void
+    {
+        Log::spy();
+        config()->set('rdvpermis.api_url', 'https://api.example.test');
+        Http::fake(['https://api.example.test/*' => Http::response([
+            'code' => 'MANDAT_INVALIDE',
+            'nom' => 'Dupont',
+            'prenom' => 'Alice',
+            'email' => 'alice.dupont@example.test',
+            'numeroDossier' => '123456789012',
+            'message' => 'Candidat Alice Dupont : alice.dupont@example.test',
+        ], 400)]);
+
+        $tokens = Mockery::mock(TokenService::class);
+        $tokens->shouldReceive('accessToken')->once()->andReturn('access-token');
+
+        try {
+            (new ApiClient($tokens))->get((new User)->forceFill(['id' => 1]), '/api/v2/auto-ecole/moi');
+            $this->fail('The upstream validation response should throw an exception.');
+        } catch (RdvPermisApiException $exception) {
+            $this->assertSame(400, $exception->responseStatus);
+        }
+
+        Log::shouldHaveReceived('warning')->once()->with('RdvPermis API request failed', Mockery::on(
+            fn (array $context) => $context['rdvpermis_error'] === 'MANDAT_INVALIDE'
+                && $context['rdvpermis_message'] === '[redacted]'
+                && ! str_contains(json_encode($context), 'Dupont')
+                && ! str_contains(json_encode($context), 'Alice')
+                && ! str_contains(json_encode($context), 'alice.dupont@example.test')
+                && ! str_contains(json_encode($context), '123456789012')
         ));
     }
 

@@ -53,14 +53,16 @@ class TokenService
             // Do not hydrate or decrypt the stale row. This affects only the
             // selected user's RDVPermis credentials, then writes fresh values
             // through the encrypted model casts using the current APP_KEY.
-            DB::table((new RdvPermisToken)->getTable())
-                ->where('user_id', $user->getKey())
-                ->delete();
+            return DB::transaction(function () use ($user, $payload) {
+                DB::table((new RdvPermisToken)->getTable())
+                    ->where('user_id', $user->getKey())
+                    ->delete();
 
-            return RdvPermisToken::query()->create([
-                'user_id' => $user->getKey(),
-                ...$this->tokenAttributes($payload),
-            ]);
+                return RdvPermisToken::query()->create([
+                    'user_id' => $user->getKey(),
+                    ...$this->tokenAttributes($payload),
+                ]);
+            });
         }
     }
 

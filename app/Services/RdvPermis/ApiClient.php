@@ -4,6 +4,7 @@ namespace App\Services\RdvPermis;
 
 use App\Exceptions\RdvPermisApiException;
 use App\Models\User;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -35,12 +36,13 @@ class ApiClient
                 ->send($method, $baseUrl.'/'.ltrim($path, '/'), array_replace($options, [
                     'allow_redirects' => false,
                 ]));
-        } catch (ConnectionException $exception) {
+        } catch (ConnectionException|RequestException $exception) {
             Log::warning('RdvPermis API connection failure', [
                 'endpoint' => $path,
                 'user_id' => $user->getKey(),
                 'method' => $method,
                 'exception' => $exception::class,
+                'curl_errno' => $this->curlErrorNumber($exception),
             ]);
 
             throw new RdvPermisApiException(
@@ -212,10 +214,11 @@ class ApiClient
      */
     private function safeProviderDiagnostic(Response $response): array
     {
-        $payload = $response->json();
-        $payload = is_array($payload) ? $this->redactSensitiveValues($payload) : null;
-        $code = $this->safeProviderCode(is_array($payload) ? $payload['code'] ?? $payload['erreur'] ?? null : null);
-        $message = $this->safeProviderMessage($payload);
+        $rawPayload = $response->json();
+        $rawPayload = is_array($rawPayload) ? $rawPayload : null;
+        $code = $this->safeProviderCode($rawPayload['code'] ?? $rawPayload['erreur'] ?? $rawPayload['error'] ?? null);
+        $message = $this->safeProviderMessage($rawPayload);
+        $payload = $rawPayload === null ? null : $this->redactSensitiveValues($rawPayload);
         $body = $payload === null ? $this->safeText($response->body()) : $this->safeText(json_encode($payload));
 
         return compact('code', 'message', 'body');
@@ -224,7 +227,7 @@ class ApiClient
     private function redactSensitiveValues(array $payload): array
     {
         foreach ($payload as $key => $value) {
-            if (preg_match('/(authorization|token|secret|password|api[_-]?key)/i', (string) $key)) {
+            if (preg_match('/(authorization|token|secret|password|api[_-]?key|email|neph|numero[_-]?(dossier|neph)|first[_-]?name|last[_-]?name|prenom|nom|date[_-]?naissance|birth[_-]?date|candidat(e)?|message|detail|error(_description)?)/i', (string) $key)) {
                 $payload[$key] = '[redacted]';
             } elseif (is_array($value)) {
                 $payload[$key] = $this->redactSensitiveValues($value);
@@ -242,7 +245,7 @@ class ApiClient
 
         $code = strtoupper(trim((string) $code));
 
-        return $code === '' ? null : mb_substr($code, 0, 100);
+        return preg_match('/^[A-Z][A-Z0-9_-]{0,99}$/', $code) ? $code : null;
     }
 
     private function safeProviderMessage(?array $payload): ?string
@@ -253,7 +256,11 @@ class ApiClient
 
         foreach (['message', 'error_description', 'detail', 'error'] as $key) {
             if (is_string($payload[$key] ?? null) && $payload[$key] !== '') {
-                return $this->safeText($payload[$key], 500);
+                $message = $this->safeText($payload[$key], 500);
+
+                return $message !== null && preg_match('/\b(candidat(?:e)?|nom|pr[ée]nom|e-?mail|neph|num[ée]ro(?:\s+de)?\s+dossier)\b/ui', $message)
+                    ? '[redacted]'
+                    : $message;
             }
         }
 
@@ -269,7 +276,20 @@ class ApiClient
         $value = preg_replace('/[\r\n]+/', ' ', $value) ?? '';
         $value = preg_replace('/\b(authorization\s*:\s*bearer\s+|bearer\s+)[^\s,&}]+/i', '$1[redacted]', $value) ?? '';
         $value = preg_replace('/\b(access_token|refresh_token|client_secret|authorization)\s*["\']?\s*[:=]\s*["\']?[^\s,&}"\']+/i', '$1=[redacted]', $value) ?? '';
+        $value = preg_replace('/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i', '[redacted-email]', $value) ?? '';
+        $value = preg_replace('/\b\d{12}\b/', '[redacted-neph]', $value) ?? '';
 
         return mb_substr($value, 0, $limit);
+    }
+
+    private function curlErrorNumber(ConnectionException|RequestException $exception): ?int
+    {
+        if (! $exception instanceof RequestException) {
+            return null;
+        }
+
+        $errno = $exception->getHandlerContext()['errno'] ?? null;
+
+        return is_int($errno) ? $errno : null;
     }
 }

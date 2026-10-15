@@ -37,11 +37,15 @@ class CancellationService implements CancellationInterface
             return $this->flashError("Cette session ne peut pas être annulée.");
         }
 
+        $isMonitorRequest = ($attributes['requested_by'] ?? null) === 'monitor';
         $canceledPerThreeDay = $this->checkCancellationPerThreeDays($attributes['training_id']);
-        if ($canceledPerThreeDay) {
+        if (!$isMonitorRequest && $canceledPerThreeDay) {
             return $this->handleImmediateCancellation($attributes['training_id']);
         }
 
+        // Monitor cancellations always require an administrator decision.
+        // Store the request so it appears in Admin > Sessions > Annulations.
+        unset($attributes['requested_by']);
         $annulation = $this->storeCancellation($attributes);
         session()->flash('success', "Nous avons bien reçu votre demande d'annulation.");
         return $annulation;

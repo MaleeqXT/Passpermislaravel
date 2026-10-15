@@ -24,7 +24,8 @@ class StoreOrUpdateCancellationRequest extends FormRequest
     {
         return [
             'training_id' => 'required|exists:trainings,id',
-            'comment' => 'required|string'
+            'comment' => 'required|string',
+            'requested_by' => 'nullable|in:monitor,student',
         ];
     }
 

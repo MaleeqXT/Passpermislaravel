@@ -40,13 +40,14 @@ class StudentCancellationController extends Controller
     DB::beginTransaction();
 
     try {
-        $service->TryCancellation($request->validated());
+        $cancellation = $service->TryCancellation($request->validated());
 
         DB::commit();
 
         return response()->json([
             'success' => true,
             'message' => 'Cancellation created successfully.',
+            'cancellation' => $cancellation,
         ], 200);
 
     } catch (Exception $e) {
