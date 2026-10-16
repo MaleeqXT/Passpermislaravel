@@ -12,6 +12,7 @@ use App\Models\Roles\Student\Schedule\Rating;
 use App\Models\Roles\Student\User\Student;
 use App\Notifications\V1\Monitor\Training\StudentTrainingBookletNotification;
 use App\Services\SatisfactionOfferTriggerService;
+use App\Services\DrivingLessonMilestoneService;
 use App\Services\Student\Training\FormationWalletMinutesService;
 use App\Services\Monitor\Training\StudentTrainingBookletPdfService;
 use App\Services\Student\Training\info\TrainingInterface;
@@ -255,7 +256,7 @@ class FormationController extends Controller
             throw ValidationException::withMessages(['date' => 'Une nouvelle leçon doit être programmée dans le futur.']);
         }
 
-        $reservation = DB::transaction(function () use ($values, $monitor, $student, $planning, $trainingService) {
+        [$reservation, $milestoneAlert] = DB::transaction(function () use ($values, $monitor, $student, $planning, $trainingService) {
             $this->walletMinutes()->assertAvailable($student, $values['offer_id'], $values['duration_minutes']);
             Monitor::whereKey($monitor->id)->lockForUpdate()->firstOrFail();
             $this->checkConflicts($monitor, $student, $values);
@@ -267,10 +268,15 @@ class FormationController extends Controller
                 'duration_minutes' => $values['duration_minutes'],
             ], $reservation);
             $this->writeEvaluation($reservation, $student, $monitor, $values);
-            return $reservation;
+            $milestoneAlert = app(DrivingLessonMilestoneService::class)->forUpcomingLesson($student, $reservation);
+
+            return [$reservation, $milestoneAlert];
         });
 
-        return response()->json(['data' => $this->payload($reservation->fresh(['training.offer', 'evaluation', 'reviewMonitor']))], 201);
+        return response()->json([
+            'data' => $this->payload($reservation->fresh(['training.offer', 'evaluation', 'reviewMonitor'])),
+            'milestone_alert' => app(DrivingLessonMilestoneService::class)->payload($milestoneAlert),
+        ], 201);
     }
 
     public function update(Request $request, Student $student, Reservation $reservation, ReservationInterface $planning)
@@ -279,7 +285,7 @@ class FormationController extends Controller
         $this->authorizeLesson($monitor, $student, $reservation);
         $values = $this->validated($request, $monitor);
 
-        DB::transaction(function () use ($reservation, $student, $monitor, $values, $planning) {
+        $milestoneAlert = DB::transaction(function () use ($reservation, $student, $monitor, $values, $planning) {
             $this->lockEditable($reservation);
             $previous = $reservation->training;
             $previousMinutes = $this->durationMinutes($reservation);
@@ -316,9 +322,14 @@ class FormationController extends Controller
 
             $previous->update(['offer_id' => $values['offer_id'], 'session_type' => $values['type']]);
             $this->writeEvaluation($reservation, $student, $monitor, $values);
+
+            return app(DrivingLessonMilestoneService::class)->forUpcomingLesson($student, $reservation);
         });
 
-        return response()->json(['data' => $this->payload($reservation->fresh(['training.offer', 'evaluation', 'reviewMonitor']))]);
+        return response()->json([
+            'data' => $this->payload($reservation->fresh(['training.offer', 'evaluation', 'reviewMonitor'])),
+            'milestone_alert' => app(DrivingLessonMilestoneService::class)->payload($milestoneAlert),
+        ]);
     }
 
     public function destroy(Request $request, Student $student, Reservation $reservation, ReservationInterface $planning)

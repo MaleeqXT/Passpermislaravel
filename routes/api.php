@@ -6,6 +6,7 @@ use App\Http\Controllers\Backend\Front\ContactController;
 use App\Http\Controllers\Backend\Front\Offers\OffersController;
 use App\Http\Controllers\Backend\Front\StudentsController;
 use App\Http\Controllers\ReservationCommentController;
+use App\Http\Controllers\DrivingLessonMilestoneAlertController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\CandidateMandateController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\CandidateEligibilityController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\CentreController;
@@ -145,6 +146,12 @@ Route::prefix('pages')->name('pages.')
 Route::get('/candidates', [ZoneController::class, 'getCandidates'])->name('api.candidates.index');
 
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'slow'])->group(function () {
+    Route::middleware('role:admin|super-admin|secretary')->get('/driving-lesson-milestones/pending', [DrivingLessonMilestoneAlertController::class, 'pending'])
+        ->name('driving-lesson-milestones.pending');
+
+    Route::post('/driving-lesson-milestones/{milestoneAlert}/acknowledge', [DrivingLessonMilestoneAlertController::class, 'acknowledge'])
+        ->name('driving-lesson-milestones.acknowledge');
+
     Route::get('/students/{student}/contract', [StudentUserController::class, 'showContract'])
         ->name('students.contract.show');
     Route::post('/students/{student}/required-documents', [StudentUserController::class, 'storeRequiredDocument'])

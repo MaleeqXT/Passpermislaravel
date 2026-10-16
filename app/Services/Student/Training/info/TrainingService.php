@@ -23,6 +23,7 @@ use App\Repository\V2\Student\Schedule\Training\Job\StudentInTrainingRepo;
 use App\Repository\V2\Student\Schedule\Training\Wallet\FetchWalletRepo;
 use App\Repository\V2\Student\Schedule\Training\Wallet\IncOrDecWalletRepo;
 use App\Services\Student\Training\FormationWalletMinutesService;
+use App\Services\DrivingLessonMilestoneService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
@@ -92,6 +93,13 @@ class TrainingService implements TrainingInterface
         $attributes['reservation_id'] = $reservation->id;
 
         $training = StoreTrainingRepo::run(Arr::only($attributes, ['student_id', 'reservation_id', 'offer_id', 'session_type', 'prestation']));
+
+        // Keep the milestone rule at the common training-creation boundary so
+        // it also covers bookings made outside the calendar screen.
+        app(DrivingLessonMilestoneService::class)->forUpcomingLesson(
+            Student::query()->findOrFail($attributes['student_id']),
+            $reservation,
+        );
 
         RefusedAllTrainingProposalRepo::run($reservation);
         $this->sendTrainingNotifications($attributes['student_id'], $reservation);

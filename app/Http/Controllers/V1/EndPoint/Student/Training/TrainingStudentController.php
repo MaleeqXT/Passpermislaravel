@@ -13,6 +13,7 @@ use App\Models\Roles\Student\Schedule\Training;
 use App\Models\Roles\Student\User\Student;
 use App\Repository\V2\Monitor\Schedule\Reservation\Job\Admin\FetchByWeekAllAvailableReservationRepo;
 use App\Services\Student\Training\info\TrainingInterface;
+use App\Services\DrivingLessonMilestoneService;
 
 //use App\Repository\Admin\User\GetAllAdmins;
 
@@ -183,9 +184,12 @@ class TrainingStudentController extends Controller
                 ], $reservation);
             });
 
+            $milestoneAlert = app(DrivingLessonMilestoneService::class)->forUpcomingLesson($student, $training->reservation);
+
             return response()->json([
                 'message' => 'Séance réservée avec succès.',
                 'data' => $training->load('reservation.monitor.user', 'reservation.lieu', 'offer'),
+                'milestone_alert' => app(DrivingLessonMilestoneService::class)->payload($milestoneAlert),
             ], 201);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
             return response()->json(['message' => 'Créneau indisponible.'], 422);

@@ -7,6 +7,7 @@ use App\Http\Requests\V1\Student\Schedule\Reservation\StoreReservationRequest;
 use App\Http\Requests\V1\Student\Schedule\Reservation\UpdateReservationRequest;
 use App\Http\Requests\V1\Student\Schedule\StoreOrUpdateScheduleRequest;
 use App\Models\Roles\Monitor\Schedule\Reservation;
+use App\Models\Roles\Student\User\Student;
 use App\Notifications\V1\Monitor\Training\Cancellation\CancellationTrainingMonitorNotification;
 use App\Notifications\V1\Student\Training\Cancellation\CancellationTrainingStudentNotification;
 use App\Repository\V2\Monitor\Schedule\Reservation\Job\Admin\FetchByMonthAllReservationRepo;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use App\Enums\V2\Student\Schedule\Wallet\WalletStatusEnum;
+use App\Services\DrivingLessonMilestoneService;
 use Throwable;
 class ReservationAdminController extends Controller
 {
@@ -111,7 +113,7 @@ class ReservationAdminController extends Controller
         TrainingInterface $service
     ): JsonResponse {
 
-    
+        $milestoneAlert = null;
         DB::beginTransaction();
 
         try {
@@ -127,12 +129,16 @@ class ReservationAdminController extends Controller
                 $reservation
             );
 
+            $student = Student::query()->findOrFail($request->input('student_id'));
+            $milestoneAlert = app(DrivingLessonMilestoneService::class)->forUpcomingLesson($student, $reservation);
+
             DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Le Planning a été ajouté avec succès.',
-                'data' => $reservation
+                'data' => $reservation,
+                'milestone_alert' => app(DrivingLessonMilestoneService::class)->payload($milestoneAlert),
             ]);
 
         } catch (\Throwable $e) {
@@ -173,6 +179,7 @@ class ReservationAdminController extends Controller
      */
     public function update(Reservation $reservation, UpdateReservationRequest $request, TrainingInterface $service, ReservationInterface $reservationService): JsonResponse
     {
+        $milestoneAlert = null;
         DB::beginTransaction();
         try {
             $originalReservationHour = (int) ($reservation->hour ?? 0);
@@ -190,12 +197,16 @@ class ReservationAdminController extends Controller
                 $service->create($request->only('student_id', 'offer_id', 'hour', 'session_type', 'prestation'), $reservation);
             }
 
+            $student = Student::query()->findOrFail($request->input('student_id'));
+            $milestoneAlert = app(DrivingLessonMilestoneService::class)->forUpcomingLesson($student, $reservation);
+
             DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Le Planning est bien Modifier',
-                'data' => $reservation
+                'data' => $reservation,
+                'milestone_alert' => app(DrivingLessonMilestoneService::class)->payload($milestoneAlert),
             ]);
         } catch (Exception $e) {
             DB::rollback();
