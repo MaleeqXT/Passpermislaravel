@@ -11,14 +11,19 @@ use App\Models\Roles\Monitor\User\Monitor;
 use App\Models\Roles\Student\Schedule\Rating;
 use App\Models\Roles\Student\User\Student;
 use App\Notifications\V1\Monitor\Training\StudentTrainingBookletNotification;
-use App\Services\SatisfactionOfferTriggerService;
-use App\Services\DrivingLessonMilestoneService;
-use App\Services\Student\Training\FormationWalletMinutesService;
+use App\Services\Monitor\Student\MonitorStudentProfileCodeService;
+use App\Services\Monitor\Student\MonitorStudentHoursService;
+use App\Services\Monitor\Student\MonitorExamReadinessService;
+use App\Services\Monitor\Training\ManeuverOccurrenceService;
 use App\Services\Monitor\Training\StudentTrainingBookletPdfService;
+use App\Services\SatisfactionOfferTriggerService;
+use App\Services\Student\Training\FormationWalletMinutesService;
 use App\Services\Student\Training\info\TrainingInterface;
 use App\Services\Student\Training\Reservation\info\ReservationInterface;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
@@ -44,8 +49,9 @@ class FormationController extends Controller
         'giratoire' => 'Giratoire', 'arret_precision' => 'Arrêt de précision',
     ];
 
-    public function index(Request $request, Student $student)
+    public function index(Request $request, Student $student, ?ManeuverOccurrenceService $maneuvers = null)
     {
+        $maneuvers ??= app(ManeuverOccurrenceService::class);
         $monitor = $this->monitor($request);
         $this->authorizeStudent($monitor, $student);
         $lessons = $this->studentLessons($student)
@@ -70,9 +76,85 @@ class FormationController extends Controller
                 'offers' => $offers,
                 'types' => $lessons->map(fn ($lesson) => $lesson->training?->session_type)->filter()->prepend('Prestation')->unique()->values(),
                 'durations' => collect(self::DURATION_OPTIONS)->map(fn ($minutes) => ['minutes' => $minutes, 'label' => self::DURATION_LABELS[$minutes]])->values(),
+                // The editor is driven by the administrator-managed catalogue.
+                // Legacy entries remain readable through their saved snapshot.
+                'maneuvers' => $maneuvers->activeCatalog(),
                 'can_sign' => (string) $request->user()?->monitor?->id === (string) $monitor->id,
             ],
         ]]);
+    }
+
+    /**
+     * Read-only counters for the monitor's existing student fiche.
+     * Authorization intentionally matches every other Formation endpoint.
+     */
+    public function profileHours(Request $request, Student $student, MonitorStudentHoursService $hours): JsonResponse
+    {
+        $monitor = $this->monitor($request);
+        $this->authorizeStudent($monitor, $student);
+
+        return response()->json(['data' => $hours->for($monitor, $student)]);
+    }
+
+    /**
+     * Read-only visual profile data for the monitor's authorised candidate.
+     * It deliberately uses the monitor route instead of the student endpoint.
+     */
+    public function profileExam(Request $request, Student $student, MonitorStudentProfileCodeService $profileCode): JsonResponse
+    {
+        $monitor = $this->monitor($request);
+        $this->authorizeStudent($monitor, $student);
+
+        return response()->json(['data' => $profileCode->for($monitor, $student)]);
+    }
+
+    /**
+     * Returns the monitor-owned preparation state together with the existing
+     * staff/student exam appointment summary. No booking record is changed.
+     */
+    public function examReadiness(Request $request, Student $student, MonitorExamReadinessService $readiness): JsonResponse
+    {
+        $monitor = $this->monitor($request);
+        $this->authorizeStudent($monitor, $student);
+
+        return response()->json(['data' => $readiness->for($student)]);
+    }
+
+    /**
+     * Saves only the instructor's recommendation and training conditions.
+     * Secretariat remains the sole owner of the actual exam booking/result.
+     */
+    public function updateExamReadiness(Request $request, Student $student, MonitorExamReadinessService $readiness): JsonResponse
+    {
+        $monitor = $this->monitor($request);
+        $this->authorizeStudent($monitor, $student);
+
+        $validated = $request->validate([
+            'is_ready' => ['required', 'boolean'],
+            'additional_hours' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'practice_frequency' => ['nullable', 'string', 'max:120'],
+            'observation' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        foreach (['practice_frequency', 'observation'] as $field) {
+            if (array_key_exists($field, $validated) && is_string($validated[$field])) {
+                $validated[$field] = trim($validated[$field]) ?: null;
+            }
+        }
+
+        return response()->json([
+            'message' => 'Préparation à l’examen enregistrée.',
+            'data' => $readiness->update($monitor, $student, $validated),
+        ]);
+    }
+
+    /** Detailed, chronological manoeuvre log for this monitor/student pair. */
+    public function maneuverHistory(Request $request, Student $student, ManeuverOccurrenceService $maneuvers): JsonResponse
+    {
+        $monitor = $this->monitor($request);
+        $this->authorizeStudent($monitor, $student);
+
+        return response()->json(['data' => $maneuvers->history($monitor, $student)]);
     }
 
     public function sendBooklet(Request $request, Student $student)
@@ -93,6 +175,7 @@ class FormationController extends Controller
             'lesson_count' => $lessons->count(),
         ]]);
     }
+
     public function downloadBooklet(Request $request, Student $student, StudentTrainingBookletPdfService $booklet)
     {
         $monitor = $this->monitor($request);
@@ -165,6 +248,7 @@ class FormationController extends Controller
             'isAdmin' => true,
         ]);
     }
+
     /**
      * The question wizard belongs to the same initial-evaluation record as the
      * fiche. Keeping it here prevents a second, disconnected student dossier.
@@ -214,6 +298,7 @@ class FormationController extends Controller
 
         return response()->json(['data' => $this->initialEvaluationQuestionsPayload($student->fresh('user'), $updated)]);
     }
+
     public function schema(Request $request, Student $student, Reservation $reservation)
     {
         $monitor = $this->monitor($request);
@@ -222,7 +307,10 @@ class FormationController extends Controller
 
         return response()->json(['data' => [
             'schema' => $this->schemaFromData($data),
-            'editable' => !$this->isCancelled($reservation),
+            'pedagogical_diagram' => $data['formation']['pedagogical_diagram'] ?? null,
+            // A signed lesson remains readable, but its pedagogical evidence
+            // must have the same immutable status as the rest of the lesson.
+            'editable' => ! $this->isCancelled($reservation) && ! $this->hasFormationSignature($reservation),
         ]]);
     }
 
@@ -235,7 +323,12 @@ class FormationController extends Controller
         DB::transaction(function () use ($reservation, $student, $monitor, $schema) {
             $this->lockSchemaEditable($reservation);
             $data = $reservation->evaluation?->data ?? [];
-            $data['formation'] = array_merge($data['formation'] ?? [], ['schema' => $schema]);
+            $data['formation'] = array_merge($data['formation'] ?? [], [
+                'schema' => $schema,
+                // Keep an explicit reference to a built-in educational diagram
+                // while preserving the full whiteboard payload above it.
+                'pedagogical_diagram' => $this->pedagogicalDiagramReference($schema),
+            ]);
             DocumentEvaluation::updateOrCreate(
                 ['student_id' => $student->id, 'reservation_id' => $reservation->id],
                 ['monitor_id' => $monitor->id, 'data' => $data],
@@ -244,9 +337,11 @@ class FormationController extends Controller
 
         return response()->json(['data' => [
             'schema' => $schema,
+            'pedagogical_diagram' => $this->pedagogicalDiagramReference($schema),
             'saved_at' => now()->toIso8601String(),
         ]]);
     }
+
     public function store(Request $request, Student $student, ReservationInterface $planning, TrainingInterface $trainingService)
     {
         $monitor = $this->monitor($request);
@@ -256,7 +351,7 @@ class FormationController extends Controller
             throw ValidationException::withMessages(['date' => 'Une nouvelle leçon doit être programmée dans le futur.']);
         }
 
-        [$reservation, $milestoneAlert] = DB::transaction(function () use ($values, $monitor, $student, $planning, $trainingService) {
+        $reservation = DB::transaction(function () use ($values, $monitor, $student, $planning, $trainingService) {
             $this->walletMinutes()->assertAvailable($student, $values['offer_id'], $values['duration_minutes']);
             Monitor::whereKey($monitor->id)->lockForUpdate()->firstOrFail();
             $this->checkConflicts($monitor, $student, $values);
@@ -268,24 +363,20 @@ class FormationController extends Controller
                 'duration_minutes' => $values['duration_minutes'],
             ], $reservation);
             $this->writeEvaluation($reservation, $student, $monitor, $values);
-            $milestoneAlert = app(DrivingLessonMilestoneService::class)->forUpcomingLesson($student, $reservation);
 
-            return [$reservation, $milestoneAlert];
+            return $reservation;
         });
 
-        return response()->json([
-            'data' => $this->payload($reservation->fresh(['training.offer', 'evaluation', 'reviewMonitor'])),
-            'milestone_alert' => app(DrivingLessonMilestoneService::class)->payload($milestoneAlert),
-        ], 201);
+        return response()->json(['data' => $this->payload($reservation->fresh(['training.offer', 'evaluation', 'reviewMonitor']))], 201);
     }
 
     public function update(Request $request, Student $student, Reservation $reservation, ReservationInterface $planning)
     {
         $monitor = $this->monitor($request);
         $this->authorizeLesson($monitor, $student, $reservation);
-        $values = $this->validated($request, $monitor);
+        $values = $this->validated($request, $monitor, $this->maneuverCountsFromData($reservation->evaluation?->data ?? []));
 
-        $milestoneAlert = DB::transaction(function () use ($reservation, $student, $monitor, $values, $planning) {
+        DB::transaction(function () use ($reservation, $student, $monitor, $values, $planning) {
             $this->lockEditable($reservation);
             $previous = $reservation->training;
             $previousMinutes = $this->durationMinutes($reservation);
@@ -301,7 +392,7 @@ class FormationController extends Controller
                 }
 
                 $sameOffer = $previous->offer_id === $values['offer_id'];
-                if (!$sameOffer) {
+                if (! $sameOffer) {
                     $this->walletMinutes()->assertAvailable($student, $values['offer_id'], $values['duration_minutes']);
                     $this->walletMinutes()->credit($student, $previous->offer_id, $previousMinutes);
                     $this->walletMinutes()->debit($student, $values['offer_id'], $values['duration_minutes']);
@@ -322,14 +413,9 @@ class FormationController extends Controller
 
             $previous->update(['offer_id' => $values['offer_id'], 'session_type' => $values['type']]);
             $this->writeEvaluation($reservation, $student, $monitor, $values);
-
-            return app(DrivingLessonMilestoneService::class)->forUpcomingLesson($student, $reservation);
         });
 
-        return response()->json([
-            'data' => $this->payload($reservation->fresh(['training.offer', 'evaluation', 'reviewMonitor'])),
-            'milestone_alert' => app(DrivingLessonMilestoneService::class)->payload($milestoneAlert),
-        ]);
+        return response()->json(['data' => $this->payload($reservation->fresh(['training.offer', 'evaluation', 'reviewMonitor']))]);
     }
 
     public function destroy(Request $request, Student $student, Reservation $reservation, ReservationInterface $planning)
@@ -368,7 +454,9 @@ class FormationController extends Controller
                 $length += hypot($point['x'] - $stroke[$index]['x'], $point['y'] - $stroke[$index]['y']);
             }
         }
-        if ($length < 10) throw ValidationException::withMessages(['strokes' => 'Veuillez tracer une signature lisible.']);
+        if ($length < 10) {
+            throw ValidationException::withMessages(['strokes' => 'Veuillez tracer une signature lisible.']);
+        }
 
         $review = DB::transaction(function () use ($reservation, $monitor, $student, $request, $signature) {
             $this->lockEditable($reservation);
@@ -381,6 +469,7 @@ class FormationController extends Controller
                 'digest' => hash('sha256', json_encode([$data, Rating::where('reservation_id', $reservation->id)->orderBy('id')->get()->toArray()])),
             ];
             DocumentEvaluation::updateOrCreate(['reservation_id' => $reservation->id, 'student_id' => $student->id], ['monitor_id' => $monitor->id, 'data' => $data]);
+
             return ReviewMonitor::updateOrCreate(['reservation_id' => $reservation->id], [
                 'monitor_id' => $monitor->id, 'is_absent' => false,
                 'comment' => ($data['public_observations'] ?? '') ?: 'Leçon terminée et signée par le moniteur.',
@@ -399,10 +488,11 @@ class FormationController extends Controller
     {
         $user = $request->user();
         $monitor = $user?->monitor;
-        if (!$monitor && $user?->hasAnyRole(['admin', 'super-admin']) && $request->filled('monitor_id')) {
+        if (! $monitor && $user?->hasAnyRole(['admin', 'super-admin']) && $request->filled('monitor_id')) {
             $monitor = Monitor::whereKey($request->input('monitor_id'))->orWhere('user_id', $request->input('monitor_id'))->first();
         }
         abort_unless($monitor, 403, 'Compte moniteur requis.');
+
         return $monitor;
     }
 
@@ -449,7 +539,12 @@ class FormationController extends Controller
         $reservation->setRawAttributes($locked->getAttributes(), true);
         $reservation->unsetRelation('evaluation');
         abort_if($this->isCancelled($reservation), 422, 'Une leçon annulée ne peut pas être modifiée.');
-        abort_if(isset($reservation->evaluation?->data['formation_signature']), 423, 'Cette leçon est signée et ne peut plus être modifiée.');
+        abort_if($this->hasFormationSignature($reservation), 423, 'Cette leçon est signée et ne peut plus être modifiée.');
+    }
+
+    private function hasFormationSignature(Reservation $reservation): bool
+    {
+        return isset($reservation->evaluation?->data['formation_signature']);
     }
 
     private function schemaFromData(array $data): ?array
@@ -457,6 +552,20 @@ class FormationController extends Controller
         $schema = $data['formation']['schema'] ?? null;
 
         return is_array($schema) ? $schema : null;
+    }
+
+    private function pedagogicalDiagramReference(array $schema): ?array
+    {
+        $background = $schema['background'] ?? null;
+        if (! is_array($background) || blank($background['id'] ?? null)) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $background['id'],
+            'name' => (string) ($background['name'] ?? 'Schéma pédagogique'),
+            'asset' => (string) ($background['asset'] ?? ''),
+        ];
     }
 
     private function validatedSchema(Request $request): array
@@ -498,14 +607,17 @@ class FormationController extends Controller
 
         return $schema;
     }
+
     private function lockSchemaEditable(Reservation $reservation): void
     {
         $locked = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
         $reservation->setRawAttributes($locked->getAttributes(), true);
         $reservation->unsetRelation('evaluation');
         abort_if($this->isCancelled($reservation), 422, 'Une leçon annulée ne peut pas recevoir de schéma.');
+        abort_if($this->hasFormationSignature($reservation), 423, 'Cette leçon est signée et son schéma est disponible en lecture seule.');
     }
-    private function validated(Request $request, Monitor $monitor): array
+
+    private function validated(Request $request, Monitor $monitor, array $previousManeuverCounts = []): array
     {
         $values = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'], 'start_at' => ['required', 'date_format:H:i'],
@@ -517,13 +629,12 @@ class FormationController extends Controller
             'public_observation' => ['nullable', 'string', 'max:10000'], 'teacher_observation' => ['nullable', 'string', 'max:10000'],
             'maneuvers' => ['present', 'array', 'max:100'], 'maneuvers.*' => ['required', 'string', 'max:300'],
             'maneuver_counts' => ['nullable', 'array'], 'maneuver_counts.*' => ['integer', 'min:0', 'max:9'],
+            'maneuver_ratings' => ['nullable', 'array'], 'maneuver_ratings.*' => ['array', 'max:9'],
+            'maneuver_ratings.*.*' => ['integer', 'between:1,4'],
         ]);
 
-        foreach (array_keys($values['maneuver_counts'] ?? []) as $maneuverId) {
-            if (!array_key_exists($maneuverId, self::MANEUVERS)) {
-                throw ValidationException::withMessages(['maneuver_counts' => 'Une manœuvre sélectionnée est invalide.']);
-            }
-        }
+        $values['maneuver_counts'] = app(ManeuverOccurrenceService::class)
+            ->validateCounts($values['maneuver_counts'] ?? [], $previousManeuverCounts);
         if ($values['evaluation_initiale'] && (int) $values['duration_minutes'] !== 60) {
             throw ValidationException::withMessages(['evaluation_initiale' => 'L’évaluation initiale nécessite une durée exacte de 1 heure.']);
         }
@@ -564,18 +675,21 @@ class FormationController extends Controller
             ? $this->normalizeManeuverCounts($values['maneuver_counts'] ?? [])
             : $this->maneuverCountsFromData($data);
         $legacyManeuvers = $this->legacyManeuvers($values['maneuvers'] ?? []);
+        $ratings = $this->normalizeManeuverRatings($values['maneuver_ratings'] ?? ($data['formation']['maneuver_ratings'] ?? []), $counts);
         $data['formation'] = array_merge($data['formation'] ?? [], [
             'department' => $values['department'] ?? '',
             'boite_auto' => $values['boite_auto'],
             'is_absent' => $values['is_absent'],
             'teacher_observation' => $values['teacher_observation'] ?? '',
             'maneuver_counts' => $counts,
+            'maneuver_ratings' => $ratings,
         ]);
         $data['evaluation_initiale'] = $values['evaluation_initiale'];
         $data['evaluation_permis'] = $values['evaluation_permis'];
         $data['public_observations'] = $values['public_observation'] ?? '';
         $data['manoeuvres'] = array_values(array_merge($legacyManeuvers, $this->maneuverLabels($counts)));
         DocumentEvaluation::updateOrCreate(['student_id' => $student->id, 'reservation_id' => $reservation->id], ['monitor_id' => $monitor->id, 'data' => $data]);
+        app(ManeuverOccurrenceService::class)->sync($reservation, $student, $monitor, $counts, $ratings);
     }
 
     private function initialEvaluationReservation(Monitor $monitor, Student $student): Reservation
@@ -676,6 +790,7 @@ class FormationController extends Controller
             ],
         ];
     }
+
     private function initialEvaluationQuestionsPayload(Student $student, Reservation $reservation): array
     {
         $base = $this->initialEvaluationPayload($student, $reservation);
@@ -718,7 +833,7 @@ class FormationController extends Controller
         ]);
 
         foreach (array_keys($values['answers'] ?? []) as $key) {
-            if (!preg_match('/^q(?:0[1-9]|[1-4][0-9]|5[0-1])$/', (string) $key)) {
+            if (! preg_match('/^q(?:0[1-9]|[1-4][0-9]|5[0-1])$/', (string) $key)) {
                 throw ValidationException::withMessages(['answers' => 'Une réponse de questionnaire est invalide.']);
             }
         }
@@ -731,10 +846,18 @@ class FormationController extends Controller
         $has = fn (string $key, string $value): bool => in_array($value, (array) ($answers[$key] ?? []), true);
         $yes = fn (string $key): bool => ($answers[$key] ?? null) === 'Oui';
 
-        if (is_string($answers['q03'] ?? null)) $data['student']['profession'] = $answers['q03'];
-        if (array_key_exists('q05', $answers)) $data['student']['wears_correction'] = $yes('q05');
-        if (is_string($answers['q06'] ?? null)) $data['student']['visual_acuity'] = $answers['q06'];
-        if (is_string($answers['q07'] ?? null)) $data['student']['ophthalmologist_appointment'] = $answers['q07'];
+        if (is_string($answers['q03'] ?? null)) {
+            $data['student']['profession'] = $answers['q03'];
+        }
+        if (array_key_exists('q05', $answers)) {
+            $data['student']['wears_correction'] = $yes('q05');
+        }
+        if (is_string($answers['q06'] ?? null)) {
+            $data['student']['visual_acuity'] = $answers['q06'];
+        }
+        if (is_string($answers['q07'] ?? null)) {
+            $data['student']['ophthalmologist_appointment'] = $answers['q07'];
+        }
 
         if (array_key_exists('q01', $answers)) {
             $data['training'] = array_merge($data['training'] ?? [], [
@@ -745,8 +868,12 @@ class FormationController extends Controller
                 'supervised_driving' => $has('q01', 'Conduite supervisée'),
             ]);
         }
-        if (array_key_exists('q10', $answers)) $data['experience']['license'] = array_merge($data['experience']['license'] ?? [], ['am' => $yes('q10')]);
-        if (array_key_exists('q08', $answers)) $data['experience']['driving'] = array_merge($data['experience']['driving'] ?? [], ['already_driven' => $yes('q08')]);
+        if (array_key_exists('q10', $answers)) {
+            $data['experience']['license'] = array_merge($data['experience']['license'] ?? [], ['am' => $yes('q10')]);
+        }
+        if (array_key_exists('q08', $answers)) {
+            $data['experience']['driving'] = array_merge($data['experience']['driving'] ?? [], ['already_driven' => $yes('q08')]);
+        }
         $vehicleMappings = ['q09' => 'moped', 'q11' => 'bike', 'q12' => 'tractor', 'q13' => 'cart', 'q14' => 'quad', 'q15' => 'lawnmower', 'q16' => 'trolley'];
         foreach ($vehicleMappings as $question => $field) {
             if (array_key_exists($question, $answers)) {
@@ -762,9 +889,14 @@ class FormationController extends Controller
             $data['attitude']['inevitable_step'] = $answers['q18'] === 'Un passage inévitable';
             $data['attitude']['desire_to_do_it'] = $answers['q18'] === 'Une envie de connaître';
         }
-        if (array_key_exists('score', $final)) $data['results']['score'] = $final['score'];
-        if (array_key_exists('lessons_proposed', $final)) $data['results']['lessons_proposed'] = $final['lessons_proposed'];
+        if (array_key_exists('score', $final)) {
+            $data['results']['score'] = $final['score'];
+        }
+        if (array_key_exists('lessons_proposed', $final)) {
+            $data['results']['lessons_proposed'] = $final['lessons_proposed'];
+        }
     }
+
     private function initialEvaluationData(array $stored, Student $student): array
     {
         $bool = fn ($section, $key, $fallback = false): bool => (bool) (($stored[$section][$key] ?? $fallback));
@@ -907,38 +1039,67 @@ class FormationController extends Controller
             'data.results.monitor_signature' => ['nullable', 'string', 'max:1000000'],
         ]);
     }
+
     private function normalizeManeuverCounts(array $counts): array
     {
         return collect($counts)->mapWithKeys(fn ($count, $id) => [(string) $id => max(0, min(9, (int) $count))])
-            ->filter(fn ($count, $id) => $count > 0 && array_key_exists($id, self::MANEUVERS))->all();
+            ->filter(fn ($count) => $count > 0)->all();
     }
 
     private function maneuverCountsFromData(array $data): array
     {
         $stored = $data['formation']['maneuver_counts'] ?? null;
-        if (is_array($stored)) return $this->normalizeManeuverCounts($stored);
+        if (is_array($stored)) {
+            return $this->normalizeManeuverCounts($stored);
+        }
         $counts = [];
         foreach ((array) ($data['manoeuvres'] ?? $data['maneuvers'] ?? []) as $maneuver) {
             $id = array_search($maneuver, self::MANEUVERS, true);
-            if ($id !== false) $counts[$id] = ($counts[$id] ?? 0) + 1;
+            if ($id !== false) {
+                $counts[$id] = ($counts[$id] ?? 0) + 1;
+            }
         }
+
         return $this->normalizeManeuverCounts($counts);
     }
 
     private function maneuverLabels(array $counts): array
     {
-        return collect($counts)->map(fn ($count, $id) => $count === 1 ? self::MANEUVERS[$id] : self::MANEUVERS[$id].' × '.$count)->values()->all();
+        $labels = collect(app(ManeuverOccurrenceService::class)->allCatalog())->pluck('name', 'slug');
+        return collect($counts)->map(function ($count, $id) use ($labels) {
+            $label = $labels->get($id, self::MANEUVERS[$id] ?? (string) $id);
+            return $count === 1 ? $label : $label.' × '.$count;
+        })->values()->all();
     }
 
     private function legacyManeuvers(array $maneuvers): array
     {
-        return collect($maneuvers)->filter(function ($maneuver) {
-            if (!is_string($maneuver)) return false;
-            foreach (self::MANEUVERS as $label) {
-                if ($maneuver === $label || preg_match('/^'.preg_quote($label, '/').' × [1-9]$/u', $maneuver)) return false;
+        $catalogLabels = collect(app(ManeuverOccurrenceService::class)->allCatalog())->pluck('name')->all();
+        return collect($maneuvers)->filter(function ($maneuver) use ($catalogLabels) {
+            if (! is_string($maneuver)) {
+                return false;
             }
+            foreach (array_unique(array_merge(array_values(self::MANEUVERS), $catalogLabels)) as $label) {
+                if ($maneuver === $label || preg_match('/^'.preg_quote($label, '/').' × [1-9]$/u', $maneuver)) {
+                    return false;
+                }
+            }
+
             return true;
         })->values()->all();
+    }
+
+    private function normalizeManeuverRatings(array $ratings, array $counts): array
+    {
+        $result = [];
+        foreach ($counts as $id => $count) {
+            $raw = is_array($ratings[$id] ?? null) ? $ratings[$id] : [$ratings[$id] ?? 1];
+            $result[$id] = [];
+            for ($index = 0; $index < $count; $index++) {
+                $result[$id][] = min(4, max(1, (int) ($raw[$index] ?? $raw[0] ?? 1)));
+            }
+        }
+        return $result;
     }
 
     private function durationMinutes(Reservation $reservation): int
@@ -948,7 +1109,7 @@ class FormationController extends Controller
 
     private function isCancelled(Reservation $reservation): bool
     {
-        return !$reservation->is_active || (int) $reservation->training?->cancellation?->status === 3;
+        return ! $reservation->is_active || (int) $reservation->training?->cancellation?->status === 3;
     }
 
     private function hasEnded(Reservation $reservation): bool
@@ -961,7 +1122,7 @@ class FormationController extends Controller
         return app(FormationWalletMinutesService::class);
     }
 
-    private function payload(Reservation $reservation, ?int $number = null, ?\Illuminate\Support\Collection $lessonRatings = null, ?Monitor $viewer = null): array
+    private function payload(Reservation $reservation, ?int $number = null, ?Collection $lessonRatings = null, ?Monitor $viewer = null): array
     {
         $data = $reservation->evaluation?->data ?? [];
         $meta = $data['formation'] ?? [];
@@ -972,6 +1133,7 @@ class FormationController extends Controller
         $duration = $this->durationMinutes($reservation);
         $ratings = $lessonRatings ?? Rating::where('reservation_id', $reservation->id)->with(['competency', 'evaluationDetail'])->get();
         $maneuverCounts = $this->maneuverCountsFromData($data);
+        $maneuverRatings = app(ManeuverOccurrenceService::class)->ratingsForReservation($reservation, $meta['maneuver_ratings'] ?? []);
 
         return [
             'id' => $reservation->id, 'number' => $number, 'date' => $reservation->date->toDateString(),
@@ -984,10 +1146,12 @@ class FormationController extends Controller
             'evaluation_permis' => (bool) ($data['evaluation_permis'] ?? false),
             'public_observation' => $data['public_observations'] ?? '',
             'teacher_observation' => $meta['teacher_observation'] ?? $reservation->reviewMonitor?->comment ?? '',
-            'maneuvers' => array_values((array) ($data['manoeuvres'] ?? $data['maneuvers'] ?? [])), 'maneuver_counts' => $maneuverCounts, 'has_schema' => is_array($meta['schema'] ?? null), 'is_absent' => $absent,
+            'maneuvers' => array_values((array) ($data['manoeuvres'] ?? $data['maneuvers'] ?? [])), 'maneuver_counts' => $maneuverCounts,
+            'maneuver_ratings' => $maneuverRatings, 'has_schema' => is_array($meta['schema'] ?? null),
+            'pedagogical_diagram' => $meta['pedagogical_diagram'] ?? null, 'is_absent' => $absent,
             'status' => $cancelled ? 'cancelled' : ($signed ? 'signed' : ($absent ? 'absent' : ($ended && $reservation->reviewMonitor?->comment ? 'completed' : ($ended ? 'past' : 'upcoming')))),
-            'signature' => $signed, 'can_manage' => !$viewer || (string) $reservation->monitor_id === (string) $viewer->id, 'can_delete' => !$signed && !$ended && !$cancelled,
-            'can_reschedule' => !$signed && !$ended && !$cancelled,
+            'signature' => $signed, 'can_manage' => ! $viewer || (string) $reservation->monitor_id === (string) $viewer->id, 'can_delete' => ! $signed && ! $ended && ! $cancelled,
+            'can_reschedule' => ! $signed && ! $ended && ! $cancelled,
             'competencies' => $ratings->map(fn ($rating) => ['id' => $rating->competency_id, 'title' => $rating->competency?->label, 'rating' => (int) $rating->rating, 'observations' => $rating->comment ?? '', 'studentEvaluation' => (bool) ($rating->evaluationDetail?->student_evaluation ?? false), 'studentResponse' => $rating->evaluationDetail?->student_response ?? '', 'activeTab' => $rating->evaluationDetail?->active_tab ?? 'pourquoi'])->values(),
         ];
     }
