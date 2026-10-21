@@ -10,6 +10,7 @@ use App\Notifications\V1\Monitor\Training\StudentTrainingBookletNotification;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -38,8 +39,12 @@ class StudentFormationController extends Controller
         if (!$student || (string) $reservation->training?->student_id !== (string) $student->id) return response()->json(['message' => 'Schéma introuvable.'], 404);
 
         $reservation->load('evaluation');
-        $schema = $reservation->evaluation?->data['formation']['schema'] ?? null;
-        return response()->json(['data' => ['schema' => is_array($schema) ? $schema : null, 'editable' => true]]);
+        $data = is_array($reservation->evaluation?->data) ? $reservation->evaluation->data : [];
+        $schema = $data['formation']['schema'] ?? null;
+        return response()->json(['data' => [
+            'schema' => is_array($schema) ? $schema : null,
+            'editable' => ! $this->hasFormationSignature($data),
+        ]]);
     }
 
     public function updateSchema(Request $request, Reservation $reservation): JsonResponse
@@ -51,13 +56,22 @@ class StudentFormationController extends Controller
 
         $schema = $this->validatedSchema($request);
 
-        $reservation->load('evaluation');
-        $data = is_array($reservation->evaluation?->data) ? $reservation->evaluation->data : [];
-        $data['formation'] = array_merge(is_array($data['formation'] ?? null) ? $data['formation'] : [], ['schema' => $schema]);
-        DocumentEvaluation::updateOrCreate(
-            ['student_id' => $student->id, 'reservation_id' => $reservation->id],
-            ['monitor_id' => $reservation->monitor_id, 'data' => $data],
-        );
+        DB::transaction(function () use ($reservation, $student, $schema): void {
+            $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            $evaluation = DocumentEvaluation::query()
+                ->where('student_id', $student->id)
+                ->where('reservation_id', $locked->id)
+                ->lockForUpdate()
+                ->first();
+            $data = is_array($evaluation?->data) ? $evaluation->data : [];
+            abort_if($this->hasFormationSignature($data), 423, 'Cette leçon est signée et son schéma est disponible en lecture seule.');
+            $data['formation'] = array_merge(is_array($data['formation'] ?? null) ? $data['formation'] : [], ['schema' => $schema]);
+
+            DocumentEvaluation::updateOrCreate(
+                ['student_id' => $student->id, 'reservation_id' => $locked->id],
+                ['monitor_id' => $locked->monitor_id, 'data' => $data],
+            );
+        });
 
         return response()->json(['data' => ['schema' => $schema, 'editable' => true]]);
     }
@@ -116,6 +130,13 @@ class StudentFormationController extends Controller
 
         return $schema;
     }
+
+    /** @param array<string, mixed> $data */
+    private function hasFormationSignature(array $data): bool
+    {
+        return isset($data['formation_signature']);
+    }
+
     private function lessons(string $studentId)
     {
         return Reservation::query()

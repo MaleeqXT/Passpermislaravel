@@ -10,23 +10,23 @@ class ConversationPolicy
 {
     public function view(User $user, Conversation $conversation): bool
     {
-        if (! ((int) $user->status === 1 && $user->deleted_at === null
+        return (int) $user->status === 1 && $user->deleted_at === null
             && $user->hasAnyRole(['student', 'monitor', 'admin', 'super-admin'])
-            && $conversation->hasParticipant($user))) {
-            return false;
-        }
-
-        // A private thread stops being accessible once the reservation is no
-        // longer upcoming. This also protects conversations created before the
-        // reservation-based rule was introduced.
-        $contactId = $conversation->participants()
-            ->where('user_id', '!=', $user->id)->value('user_id');
-
-        return $contactId && app(ChatContacts::class)->allows($user, (int) $contactId);
+            && $conversation->hasParticipant($user);
     }
 
     public function send(User $user, Conversation $conversation): bool
     {
-        return $conversation->type === 'private' && $this->view($user, $conversation);
+        if ($conversation->type !== 'private' || ! $this->view($user, $conversation)) {
+            return false;
+        }
+
+        // The historical thread stays readable by its participants after the
+        // final lesson. Sending remains subject to the existing active-contact
+        // rule, so an expired relationship cannot be reopened through chat.
+        $contactId = $conversation->participants()
+            ->where('user_id', '!=', $user->id)->value('user_id');
+
+        return $contactId && app(ChatContacts::class)->allows($user, (int) $contactId);
     }
 }

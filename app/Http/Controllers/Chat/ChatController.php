@@ -41,6 +41,9 @@ class ChatController extends Controller
 
     public function attachment(MessageAttachment $attachment)
     {
+        $message = $attachment->message;
+        abort_unless($message, 404);
+        Gate::authorize('view', $message->conversation);
         abort_unless(Storage::disk('public')->exists($attachment->path), 404);
         return Storage::disk('public')->response($attachment->path, $attachment->name, [
             'Content-Type' => $attachment->mime,
@@ -50,6 +53,7 @@ class ChatController extends Controller
 
     public function legacyAttachment(Message $message)
     {
+        Gate::authorize('view', $message->conversation);
         abort_unless($message->attachment_path && Storage::disk('public')->exists($message->attachment_path), 404);
         return Storage::disk('public')->response($message->attachment_path, $message->attachment_name, [
             'Content-Type' => $message->attachment_mime,
@@ -95,16 +99,13 @@ class ChatController extends Controller
         return response()->json(['user_id' => $userId, 'unread_count' => $count]);
     }
 
-    public function index(Request $request, ChatContacts $contacts)
+    public function index(Request $request)
     {
         $this->active($request);
         $request->validate(['page' => 'sometimes|integer|min:1']);
         $user = $request->user();
-        $contactIds = $contacts->query($user)->select('users.id');
         $conversations = $user->conversations()
             ->whereHas('participants', fn ($participants) => $participants->where('user_id', $user->id)->whereNull('hidden_at'))
-            ->whereHas('participants', fn ($participants) => $participants
-                ->where('user_id', '!=', $user->id)->whereIn('user_id', $contactIds))
             ->with(['participants.user' => fn ($q) => $q->without(['student', 'monitor', 'secretary'])->with('roles'), 'latestMessage'])
             ->withCount(['messages as unread_count' => fn ($q) => $q->where('sender_id', '!=', $user->id)->whereNull('read_at')])
             ->orderByDesc('conversations.updated_at')->orderByDesc('conversations.id')->simplePaginate(30);

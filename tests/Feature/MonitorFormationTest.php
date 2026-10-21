@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\V2\Student\Schedule\Cancellation\CancellationStatusEnum;
+use App\Enums\V2\Student\Examen\ExamenResultPermisEnum;
+use App\Enums\V2\Student\Examen\ExamenStatusEnum;
 use App\Http\Controllers\V1\EndPoint\Monitor\FormationController;
 use App\Models\DocumentEvaluation;
 use App\Models\Roles\Monitor\Schedule\Reservation;
@@ -9,7 +12,9 @@ use App\Models\Roles\Monitor\User\Monitor;
 use App\Models\Roles\Student\Schedule\Training;
 use App\Models\Roles\Student\User\Student;
 use App\Models\User;
+use App\Notifications\V1\Monitor\Exam\StudentReadyForExamNotification;
 use App\Notifications\V1\Monitor\Training\StudentTrainingBookletNotification;
+use App\Services\Monitor\Student\MonitorStudentHoursService;
 use App\Services\SatisfactionOfferTriggerService;
 use App\Services\Student\Training\info\TrainingInterface;
 use App\Services\Student\Training\Reservation\info\ReservationInterface;
@@ -20,15 +25,21 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Mime\Email;
 use Tests\TestCase;
 
 class MonitorFormationTest extends TestCase
 {
     private User $actor;
+
     private Monitor $monitor;
+
     private Student $student;
+
     private string $offer;
+
     private string $place;
+
     private FormationController $controller;
 
     protected function setUp(): void
@@ -50,6 +61,9 @@ class MonitorFormationTest extends TestCase
             'monitors' => 'id TEXT PRIMARY KEY, user_id INTEGER, status INTEGER, deleted_at TEXT, created_at TEXT, updated_at TEXT',
             'monitor_information' => 'id TEXT PRIMARY KEY, monitor_id TEXT, departement TEXT, deleted_at TEXT',
             'students' => 'id TEXT PRIMARY KEY, user_id INTEGER, balance INTEGER, neph TEXT, neph_status TEXT, boite_type INTEGER, deleted_at TEXT, created_at TEXT, updated_at TEXT',
+            'student_exams' => 'id TEXT PRIMARY KEY, student_id TEXT, user_id INTEGER, monitor_id TEXT, lieu_id TEXT, is_auto INTEGER, comment TEXT, date_examen TEXT, heure_passage TEXT, result_permis INTEGER, status INTEGER, created_at TEXT, updated_at TEXT',
+            'monitor_exam_readinesses' => 'id TEXT PRIMARY KEY, student_id TEXT, monitor_id TEXT, is_ready INTEGER, additional_hours INTEGER, practice_frequency TEXT, observation TEXT, ready_at TEXT, notification_sequence INTEGER, created_at TEXT, updated_at TEXT',
+            'monitor_exam_readiness_notifications' => 'id TEXT PRIMARY KEY, exam_readiness_id TEXT, secretary_user_id INTEGER, state_hash TEXT, notification_data TEXT, read_at TEXT, created_at TEXT, updated_at TEXT',
             'secretaries' => 'id TEXT PRIMARY KEY, user_id INTEGER, deleted_at TEXT',
             'offers' => 'id TEXT PRIMARY KEY, name TEXT, is_auto INTEGER, balance INTEGER, type_offre TEXT, color TEXT, deleted_at TEXT, created_at TEXT, updated_at TEXT',
             'wallets' => 'id TEXT PRIMARY KEY, student_id TEXT, offer_id TEXT, balance INTEGER, balance_minutes INTEGER, status INTEGER, deleted_at TEXT, created_at TEXT, updated_at TEXT',
@@ -61,13 +75,17 @@ class MonitorFormationTest extends TestCase
             'training_proposals' => 'id TEXT PRIMARY KEY, reservation_id TEXT, status INTEGER, deleted_at TEXT, created_at TEXT, updated_at TEXT',
             'review_monitors' => 'id TEXT PRIMARY KEY, reservation_id TEXT, monitor_id TEXT, is_absent INTEGER, comment TEXT, estimation REAL, created_at TEXT, updated_at TEXT',
             'document_evaluations' => 'id TEXT PRIMARY KEY, reservation_id TEXT, student_id TEXT, monitor_id TEXT, data TEXT, created_at TEXT, updated_at TEXT',
+            'maneuver_catalogs' => 'id TEXT PRIMARY KEY, slug TEXT, name TEXT, group_name TEXT, icon TEXT, sort_order INTEGER, is_active INTEGER, created_at TEXT, updated_at TEXT',
+            'maneuver_occurrences' => 'id TEXT PRIMARY KEY, maneuver_id TEXT, maneuver_slug TEXT, maneuver_name TEXT, reservation_id TEXT, student_id TEXT, monitor_id TEXT, occurred_on TEXT, sequence INTEGER, rating INTEGER, created_at TEXT, updated_at TEXT',
             'cancellations' => 'id TEXT PRIMARY KEY, training_id TEXT, status INTEGER, deleted_at TEXT',
             'media' => 'id TEXT PRIMARY KEY, mediable_id TEXT, mediable_type TEXT',
             'ratings' => 'id TEXT PRIMARY KEY, reservation_id TEXT, student_id TEXT, monitor_id TEXT, competency_id TEXT, rating INTEGER, comment TEXT, created_at TEXT, updated_at TEXT',
             'competencies' => 'id TEXT PRIMARY KEY, main_competency_id TEXT, label TEXT, status INTEGER, position INTEGER, created_at TEXT, updated_at TEXT',
             'competency_evaluation_details' => 'id TEXT PRIMARY KEY, rating_id TEXT, student_evaluation INTEGER, student_response TEXT, active_tab TEXT, created_at TEXT, updated_at TEXT',
         ];
-        foreach ($schemas as $table => $columns) DB::statement("CREATE TABLE {$table} ({$columns})");
+        foreach ($schemas as $table => $columns) {
+            DB::statement("CREATE TABLE {$table} ({$columns})");
+        }
         DB::table('users')->insert(['id' => 1, 'name' => 'Test Monitor', 'first_name' => 'Test', 'last_name' => 'Monitor', 'email' => 'monitor@example.test', 'status' => 1]);
         DB::table('users')->insert(['id' => 2, 'name' => 'Test Student', 'email' => 'student@example.test', 'phone' => '0600000000', 'date_naissance' => '2000-01-15', 'adresse' => '12 rue des Tests', 'postal' => '06000', 'ville' => 'Nice', 'status' => 1]);
         $this->monitor = Monitor::create(['user_id' => 1, 'status' => 1]);
@@ -98,6 +116,7 @@ class MonitorFormationTest extends TestCase
         $request = Request::create('/api/monitor/formation/'.$this->student->id, 'POST', $values);
         $request->headers->set('Accept', 'application/json');
         $request->setUserResolver(fn () => $this->actor);
+
         return $request;
     }
 
@@ -109,7 +128,8 @@ class MonitorFormationTest extends TestCase
             'type' => 'Prestation', 'department' => '060', 'boite_auto' => false,
             'evaluation_initiale' => false, 'evaluation_permis' => true, 'is_absent' => false,
             'public_observation' => 'Public lesson note', 'teacher_observation' => 'Private instructor note',
-            'maneuvers' => ['Stationnement'], 'maneuver_counts' => ['demarrage_cote' => 1, 'giratoire' => 2], 
+            'maneuvers' => ['Stationnement'], 'maneuver_counts' => ['demarrage_cote' => 1, 'giratoire' => 2],
+            'maneuver_ratings' => ['demarrage_cote' => [4], 'giratoire' => [1, 3]],
         ], $changes);
     }
 
@@ -117,13 +137,18 @@ class MonitorFormationTest extends TestCase
     {
         $reservation = Reservation::create(['monitor_id' => $monitorId ?: $this->monitor->id, 'lieu_id' => $this->place, 'date' => $date, 'start_at' => $start, 'end_at' => Carbon::parse($start)->addMinutes($minutes)->format('H:i'), 'hour' => (int) ceil($minutes / 60), 'duration_minutes' => $minutes, 'is_active' => 1]);
         Training::create(['reservation_id' => $reservation->id, 'student_id' => $studentId ?: $this->student->id, 'offer_id' => $this->offer, 'session_type' => 'Prestation']);
+
         return $reservation;
     }
 
     private function expectStatus(int $status, callable $action): void
     {
-        try { $action(); $this->fail('Expected an authorization/business-rule rejection.'); }
-        catch (HttpException $exception) { $this->assertSame($status, $exception->getStatusCode()); }
+        try {
+            $action();
+            $this->fail('Expected an authorization/business-rule rejection.');
+        } catch (HttpException $exception) {
+            $this->assertSame($status, $exception->getStatusCode());
+        }
     }
 
     public function test_create_update_delete_use_real_services_and_refund_reserved_hours(): void
@@ -164,6 +189,293 @@ class MonitorFormationTest extends TestCase
         $this->assertSame($this->monitor->id, $data['options']['instructors'][0]['id']);
     }
 
+    public function test_maneuver_occurrences_keep_every_rating_and_remain_scoped_to_the_authorized_monitor(): void
+    {
+        $base = '/api/monitor/formation/'.$this->student->id;
+        $created = $this->postJson($base, $this->values([
+            'maneuver_counts' => ['marche_arriere' => 1, 'creneau_droit' => 2],
+            'maneuver_ratings' => ['marche_arriere' => [1], 'creneau_droit' => [3, 4]],
+        ]))->assertCreated()
+            ->assertJsonPath('data.maneuver_ratings.marche_arriere.0', 1)
+            ->assertJsonPath('data.maneuver_ratings.creneau_droit.0', 3)
+            ->assertJsonPath('data.maneuver_ratings.creneau_droit.1', 4);
+
+        $lessonId = $created->json('data.id');
+        $this->assertSame(3, DB::table('maneuver_occurrences')->where('reservation_id', $lessonId)->count());
+        $this->assertDatabaseHas('maneuver_occurrences', ['reservation_id' => $lessonId, 'maneuver_slug' => 'creneau_droit', 'sequence' => 2, 'rating' => 4]);
+
+        $this->getJson($base.'/maneuvers')->assertOk()
+            ->assertJsonPath('data.totals.marche_arriere', 1)
+            ->assertJsonPath('data.totals.creneau_droit', 2)
+            ->assertJsonPath('data.history.0.lesson_id', $lessonId);
+
+        $otherStudent = Student::create(['user_id' => 2, 'balance' => 0]);
+        $this->getJson('/api/monitor/formation/'.$otherStudent->id.'/maneuvers')->assertForbidden();
+    }
+
+    public function test_only_an_administrator_can_manage_the_maneuver_catalog_without_deleting_history(): void
+    {
+        DB::table('roles')->insert(['id' => 10, 'name' => 'admin', 'guard_name' => 'web']);
+        DB::table('model_has_roles')->insert(['role_id' => 10, 'model_type' => User::class, 'model_id' => $this->actor->id]);
+        $this->actingAs(User::findOrFail($this->actor->id));
+
+        $created = $this->postJson('/api/admin/maneuvers', [
+            'name' => 'Demi-tour en trois temps', 'group_name' => 'Autres manœuvres', 'icon' => 'u-turn', 'sort_order' => 500,
+        ])->assertCreated()->assertJsonPath('data.name', 'Demi-tour en trois temps');
+        $id = $created->json('data.id');
+
+        $this->putJson('/api/admin/maneuvers/'.$id, ['name' => 'Demi-tour sécurisé'])
+            ->assertOk()->assertJsonPath('data.name', 'Demi-tour sécurisé');
+        $this->deleteJson('/api/admin/maneuvers/'.$id)->assertOk()
+            ->assertJsonPath('data.is_active', false);
+        $this->assertDatabaseHas('maneuver_catalogs', ['id' => $id, 'is_active' => 0]);
+
+        $this->actingAs(User::findOrFail(2));
+        $this->postJson('/api/admin/maneuvers', ['name' => 'Interdit', 'group_name' => 'Test'])->assertForbidden();
+    }
+
+    public function test_profile_hours_use_initial_evaluation_wallet_minutes_and_authorized_lessons_only(): void
+    {
+        $endpoint = '/api/monitor/formation/'.$this->student->id.'/profile-hours';
+
+        // No initial evaluation exists initially. The existing past lesson is
+        // correctly reported as completed and the wallet has not been changed.
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.initial_evaluation.estimated_hours', null)
+            ->assertJsonPath('data.hours.completed_minutes', 60)
+            ->assertJsonPath('data.hours.planned_minutes', 0)
+            ->assertJsonPath('data.hours.absence_minutes', 0)
+            ->assertJsonPath('data.hours.consumed_minutes', 60)
+            ->assertJsonPath('data.hours.remaining_minutes', 600);
+
+        $planned = $this->seedLesson('2026-10-09', start: '10:00', minutes: 45);
+        $absence = $this->seedLesson('2026-10-07', start: '10:00', minutes: 75);
+        $cancelled = $this->seedLesson('2026-10-06', start: '10:00', minutes: 90);
+
+        DocumentEvaluation::create([
+            'reservation_id' => Reservation::firstOrFail()->id,
+            'student_id' => $this->student->id,
+            'monitor_id' => $this->monitor->id,
+            'data' => ['results' => ['lessons_proposed' => 28]],
+        ]);
+        DocumentEvaluation::create([
+            'reservation_id' => $absence->id,
+            'student_id' => $this->student->id,
+            'monitor_id' => $this->monitor->id,
+            'data' => ['formation' => ['is_absent' => true]],
+        ]);
+        DB::table('cancellations')->insert([
+            'id' => (string) Str::uuid(),
+            'training_id' => Training::where('reservation_id', $cancelled->id)->value('id'),
+            'status' => CancellationStatusEnum::SUCCESS_CANCELLED->value,
+        ]);
+        DB::table('wallets')->update(['balance' => 5, 'balance_minutes' => 315]);
+
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.initial_evaluation.estimated_hours', 28)
+            ->assertJsonPath('data.hours.completed_minutes', 60)
+            ->assertJsonPath('data.hours.planned_minutes', 45)
+            ->assertJsonPath('data.hours.absence_minutes', 75)
+            ->assertJsonPath('data.hours.consumed_minutes', 135)
+            // The planned 45 minutes were already debited from the wallet;
+            // they must not be deducted from the balance a second time.
+            ->assertJsonPath('data.hours.remaining_minutes', 315);
+
+        $unlinkedStudent = Student::create(['user_id' => 2, 'balance' => 0]);
+        $this->assertSame([
+            'initial_evaluation' => ['estimated_hours' => null],
+            'hours' => [
+                'completed_minutes' => 0,
+                'planned_minutes' => 0,
+                'remaining_minutes' => 0,
+                'absence_minutes' => 0,
+                'consumed_minutes' => 0,
+            ],
+        ], app(MonitorStudentHoursService::class)->for($this->monitor, $unlinkedStudent));
+
+        DB::table('users')->insert(['id' => 3, 'name' => 'Other Monitor', 'email' => 'other-monitor@example.test', 'status' => 1]);
+        $otherMonitor = Monitor::create(['user_id' => 3, 'status' => 1]);
+        $otherStudent = Student::create(['user_id' => 3, 'balance' => 0]);
+        $this->seedLesson('2026-10-09', $otherStudent->id, $otherMonitor->id);
+        $this->getJson('/api/monitor/formation/'.$otherStudent->id.'/profile-hours')->assertForbidden();
+
+        // Keep the local variable used so static analysis sees this as a real
+        // mixed-duration planned lesson in the scenario.
+        $this->assertSame(45, $planned->duration_minutes);
+    }
+
+    public function test_profile_exam_colours_use_real_transmission_and_existing_attempt_history(): void
+    {
+        $endpoint = '/api/monitor/formation/'.$this->student->id.'/profile-exam';
+
+        // A manual student with no examination record gets neutral history,
+        // rather than an invented first presentation.
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.transmission.type', 'manual')
+            ->assertJsonPath('data.transmission.label', 'Boîte manuelle')
+            ->assertJsonPath('data.exam.presentation_number', null)
+            ->assertJsonPath('data.exam.tone', 'neutral');
+
+        DB::table('student_exams')->insert([
+            'id' => 'exam-first-pending',
+            'student_id' => $this->student->id,
+            'date_examen' => '2026-10-20',
+            'heure_passage' => '09:30:00',
+            'status' => ExamenStatusEnum::PENDING->value,
+            'created_at' => '2026-10-01 00:00:00',
+            'updated_at' => '2026-10-01 00:00:00',
+        ]);
+
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.exam.completed_attempts', 0)
+            ->assertJsonPath('data.exam.presentation_number', 1)
+            ->assertJsonPath('data.exam.presentation_label', '1ère présentation')
+            ->assertJsonPath('data.exam.tone', 'light');
+
+        DB::table('student_exams')->insert([
+            'id' => 'exam-previous-failed',
+            'student_id' => $this->student->id,
+            'date_examen' => '2026-10-01',
+            'heure_passage' => '10:00:00',
+            'status' => ExamenStatusEnum::FAILED->value,
+            'created_at' => '2026-09-01 00:00:00',
+            'updated_at' => '2026-10-01 00:00:00',
+        ]);
+
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.transmission.type', 'manual')
+            ->assertJsonPath('data.exam.presentation_number', 2)
+            ->assertJsonPath('data.exam.presentation_label', '2ème présentation')
+            ->assertJsonPath('data.exam.tone', 'dark');
+
+        $this->student->update(['boite_type' => 1]);
+
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.transmission.type', 'automatic')
+            ->assertJsonPath('data.transmission.label', 'Boîte automatique')
+            ->assertJsonPath('data.exam.completed_attempts', 1)
+            ->assertJsonPath('data.exam.presentation_number', 2)
+            ->assertJsonPath('data.exam.presentation_label', '2ème présentation')
+            ->assertJsonPath('data.exam.tone', 'dark');
+
+        $automaticFirst = Student::create(['user_id' => 2, 'balance' => 0, 'boite_type' => 1]);
+        $this->seedLesson('2026-10-09', $automaticFirst->id);
+        DB::table('student_exams')->insert([
+            'id' => 'exam-automatic-first',
+            'student_id' => $automaticFirst->id,
+            'date_examen' => '2026-10-21',
+            'heure_passage' => '14:00:00',
+            'status' => ExamenStatusEnum::PENDING->value,
+            'created_at' => '2026-10-01 00:00:00',
+            'updated_at' => '2026-10-01 00:00:00',
+        ]);
+        $this->getJson('/api/monitor/formation/'.$automaticFirst->id.'/profile-exam')->assertOk()
+            ->assertJsonPath('data.transmission.type', 'automatic')
+            ->assertJsonPath('data.exam.presentation_number', 1)
+            ->assertJsonPath('data.exam.tone', 'light');
+
+        // If neither the student profile nor a real linked lesson specifies a
+        // transmission, the endpoint returns the neutral fallback.
+        $this->student->update(['boite_type' => null]);
+        DB::table('offers')->where('id', $this->offer)->update(['is_auto' => null]);
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.transmission.type', null)
+            ->assertJsonPath('data.transmission.label', 'Type de boîte non renseigné');
+
+        $unlinked = Student::create(['user_id' => 2, 'balance' => 0]);
+        $this->getJson('/api/monitor/formation/'.$unlinked->id.'/profile-exam')->assertForbidden();
+    }
+
+    public function test_monitor_can_save_exam_readiness_notify_secretariat_once_and_read_staff_exam_status(): void
+    {
+        $endpoint = '/api/monitor/formation/'.$this->student->id.'/exam-readiness';
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.preparation.is_ready', false)
+            ->assertJsonPath('data.exam.status_label', 'En attente')
+            ->assertJsonPath('data.exam.result_label', 'En attente');
+
+        DB::table('users')->insert([
+            'id' => 3,
+            'name' => 'Secretary Test',
+            'email' => 'secretary@example.test',
+            'status' => 1,
+        ]);
+        DB::table('roles')->insert([
+            'id' => 1,
+            'name' => 'secretary',
+            'guard_name' => 'web',
+        ]);
+        DB::table('model_has_roles')->insert([
+            'role_id' => 1,
+            'model_type' => User::class,
+            'model_id' => 3,
+        ]);
+        $secretary = User::findOrFail(3);
+        $payload = [
+            'is_ready' => true,
+            'additional_hours' => 3,
+            'practice_frequency' => '1 heure par semaine',
+            'observation' => 'Consolider les contrôles avant présentation.',
+        ];
+
+        $this->putJson($endpoint, $payload)->assertOk()
+            ->assertJsonPath('data.preparation.is_ready', true)
+            ->assertJsonPath('data.preparation.additional_hours', 3)
+            ->assertJsonPath('data.preparation.practice_frequency', '1 heure par semaine')
+            ->assertJsonPath('data.notification_created', true)
+            ->assertJsonPath('data.notification_count', 1);
+        $this->assertDatabaseCount('monitor_exam_readinesses', 1);
+        $this->assertDatabaseCount('monitor_exam_readiness_notifications', 1);
+        $notification = DB::table('monitor_exam_readiness_notifications')->first();
+        $this->assertSame('/exams?student_id='.$this->student->id, json_decode($notification->notification_data, true)['booking_path']);
+        Notification::assertSentTo($secretary, StudentReadyForExamNotification::class);
+
+        // Re-submitting the unchanged ready state must not produce a duplicate
+        // notification or email for Secretariat.
+        $this->putJson($endpoint, $payload)->assertOk()
+            ->assertJsonPath('data.notification_created', false)
+            ->assertJsonPath('data.notification_count', 0);
+        $this->assertDatabaseCount('monitor_exam_readiness_notifications', 1);
+        $this->assertCount(1, Notification::sent($secretary, StudentReadyForExamNotification::class));
+
+        // Conditions may be refined as the exam gets closer. A changed ready
+        // state gets one fresh information message for the secretary.
+        $this->putJson($endpoint, [...$payload, 'additional_hours' => 6])->assertOk()
+            ->assertJsonPath('data.preparation.additional_hours', 6)
+            ->assertJsonPath('data.notification_created', true);
+        $this->assertDatabaseCount('monitor_exam_readiness_notifications', 2);
+        $this->assertCount(2, Notification::sent($secretary, StudentReadyForExamNotification::class));
+
+        DB::table('student_exams')->insert([
+            'id' => 'readiness-future-exam',
+            'student_id' => $this->student->id,
+            'date_examen' => '2026-10-20',
+            'heure_passage' => '09:30:00',
+            'status' => ExamenStatusEnum::PENDING->value,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.exam.status_label', 'Réservé à l’examen')
+            ->assertJsonPath('data.exam.date', '2026-10-20')
+            ->assertJsonPath('data.exam.result_label', 'En attente');
+
+        DB::table('student_exams')->where('id', 'readiness-future-exam')->update([
+            'status' => ExamenStatusEnum::SUCCESS->value,
+            'result_permis' => ExamenResultPermisEnum::ADMIS->value,
+            'date_examen' => '2026-10-01',
+        ]);
+        $this->getJson($endpoint)->assertOk()
+            ->assertJsonPath('data.exam.status_label', 'Terminé')
+            ->assertJsonPath('data.exam.result_label', 'Réussi');
+
+        DB::table('users')->insert(['id' => 4, 'name' => 'Other Monitor', 'email' => 'other@example.test', 'status' => 1]);
+        $otherMonitor = Monitor::create(['user_id' => 4, 'status' => 1]);
+        $otherStudent = Student::create(['user_id' => 2, 'balance' => 0]);
+        $this->seedLesson('2026-10-10', $otherStudent->id, $otherMonitor->id);
+        $this->putJson('/api/monitor/formation/'.$otherStudent->id.'/exam-readiness', $payload)->assertForbidden();
+    }
+
     public function test_monitor_can_email_the_selected_students_training_booklet(): void
     {
         $this->seedLesson('2026-10-10', start: '10:15', minutes: 75);
@@ -190,7 +502,7 @@ class MonitorFormationTest extends TestCase
             $this->assertCount(1, $mail->rawAttachments);
             $this->assertCount(1, $mail->callbacks);
 
-            $email = (new \Symfony\Component\Mime\Email())
+            $email = (new Email)
                 ->from('from@example.test')
                 ->to('to@example.test')
                 ->subject('Test')
@@ -205,6 +517,7 @@ class MonitorFormationTest extends TestCase
             return true;
         });
     }
+
     public function test_monitor_can_save_restore_and_securely_scope_lesson_schema(): void
     {
         $lesson = Reservation::firstOrFail();
@@ -233,6 +546,7 @@ class MonitorFormationTest extends TestCase
         $this->getJson('/api/monitor/formation/'.$this->student->id.'/'.$lesson->id.'/schema')
             ->assertOk()
             ->assertJsonPath('data.schema.strokes.0.color', '#169566')
+            ->assertJsonPath('data.pedagogical_diagram.id', 'roundabout')
             ->assertJsonPath('data.editable', true);
         $stored = DocumentEvaluation::where('reservation_id', $lesson->id)->firstOrFail()->data;
         $this->assertSame($schema, $stored['formation']['schema']);
@@ -243,9 +557,19 @@ class MonitorFormationTest extends TestCase
         $this->putJson('/api/monitor/formation/'.$otherStudent->id.'/'.$foreignLesson->id.'/schema', ['schema' => $schema])
             ->assertForbidden();
 
-        DocumentEvaluation::where('reservation_id', $lesson->id)->update(['data' => ['formation_signature' => ['signed_at' => now()->toIso8601String()]]]);
-        $this->putJson('/api/monitor/formation/'.$this->student->id.'/'.$lesson->id.'/schema', ['schema' => $schema])
-            ->assertOk();
+        $evaluation = DocumentEvaluation::where('reservation_id', $lesson->id)->firstOrFail();
+        $signedData = $evaluation->data;
+        $signedData['formation_signature'] = ['signed_at' => now()->toIso8601String()];
+        $evaluation->update(['data' => $signedData]);
+        $lockedSchema = $schema;
+        $lockedSchema['strokes'][0]['color'] = '#cc2b20';
+        $this->putJson('/api/monitor/formation/'.$this->student->id.'/'.$lesson->id.'/schema', ['schema' => $lockedSchema])
+            ->assertStatus(423);
+        $this->assertSame($schema, DocumentEvaluation::where('reservation_id', $lesson->id)->firstOrFail()->data['formation']['schema']);
+        $this->getJson('/api/monitor/formation/'.$this->student->id.'/'.$lesson->id.'/schema')
+            ->assertOk()
+            ->assertJsonPath('data.schema.strokes.0.color', '#169566')
+            ->assertJsonPath('data.editable', false);
         Reservation::whereKey($lesson->id)->update(['is_active' => false]);
         $this->putJson('/api/monitor/formation/'.$this->student->id.'/'.$lesson->id.'/schema', ['schema' => $schema])
             ->assertUnprocessable();
@@ -253,6 +577,7 @@ class MonitorFormationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.editable', false);
     }
+
     public function test_sign_requires_completed_attended_lesson_and_locks_saved_content(): void
     {
         $past = Reservation::first();
@@ -289,7 +614,9 @@ class MonitorFormationTest extends TestCase
         try {
             $this->controller->store($this->request($this->values(['duration_minutes' => 135])), $this->student, app(ReservationInterface::class), app(TrainingInterface::class));
             $this->fail('Invalid business hours accepted.');
-        } catch (ValidationException $exception) { $this->assertArrayHasKey('duration_minutes', $exception->errors()); }
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('duration_minutes', $exception->errors());
+        }
         $this->assertSame(2, Reservation::count());
         $this->assertSame(2, Training::count());
     }
@@ -325,7 +652,8 @@ class MonitorFormationTest extends TestCase
     public function test_competencies_are_saved_to_the_selected_lesson_through_existing_api(): void
     {
         DB::statement('CREATE TABLE main_competencies (id TEXT PRIMARY KEY, label TEXT, name TEXT, status INTEGER, position INTEGER)');
-        $group = (string) Str::uuid(); $skill = (string) Str::uuid();
+        $group = (string) Str::uuid();
+        $skill = (string) Str::uuid();
         DB::table('main_competencies')->insert(['id' => $group, 'label' => 'C1', 'name' => 'Database competency group', 'status' => 1, 'position' => 1]);
         DB::table('competencies')->insert(['id' => $skill, 'main_competency_id' => $group, 'label' => 'Existing database skill', 'status' => 1, 'position' => 1]);
         $past = Reservation::first();
@@ -393,6 +721,7 @@ class MonitorFormationTest extends TestCase
             ->assertJsonPath('data.maneuverCounts.demi_tour', 2)
             ->assertJsonPath('data.maneuverCounts.epi_gauche', 1);
     }
+
     public function test_student_formation_hides_private_notes_and_can_save_its_own_schema(): void
     {
         $lesson = Reservation::firstOrFail();
@@ -427,15 +756,27 @@ class MonitorFormationTest extends TestCase
             ->assertJsonPath('data.schema.canvas.width', 1000);
         $this->assertSame($schema, DocumentEvaluation::where('reservation_id', $lesson->id)->firstOrFail()->data['formation']['schema']);
 
+        $evaluation = DocumentEvaluation::where('reservation_id', $lesson->id)->firstOrFail();
+        $signedData = $evaluation->data;
+        $signedData['formation_signature'] = ['signed_at' => now()->toIso8601String()];
+        $evaluation->update(['data' => $signedData]);
+        $this->getJson('/api/student/formation/lessons/'.$lesson->id.'/schema')->assertOk()
+            ->assertJsonPath('data.editable', false)
+            ->assertJsonPath('data.schema.canvas.width', 1000);
+        $this->putJson('/api/student/formation/lessons/'.$lesson->id.'/schema', ['schema' => $schema])
+            ->assertStatus(423);
+
         $this->postJson('/api/student/formation/booklet', ['email' => 'other@example.test'])->assertOk();
         Notification::assertSentOnDemand(StudentTrainingBookletNotification::class, function ($notification, $channels, $notifiable): bool {
             return ($notifiable->routes['mail'] ?? null) === 'student@example.test';
         });
     }
+
     public function test_history_is_newest_first_with_independent_numbers_and_saved_evaluation_details(): void
     {
         $recent = $this->seedLesson('2026-10-09');
-        $competency = (string) Str::uuid(); $rating = (string) Str::uuid();
+        $competency = (string) Str::uuid();
+        $rating = (string) Str::uuid();
         DB::table('competencies')->insert(['id' => $competency, 'label' => 'Database skill']);
         DB::table('ratings')->insert(['id' => $rating, 'reservation_id' => $recent->id, 'competency_id' => $competency, 'rating' => 3, 'student_id' => $this->student->id, 'monitor_id' => $this->monitor->id]);
         DB::table('competency_evaluation_details')->insert(['id' => (string) Str::uuid(), 'rating_id' => $rating, 'student_evaluation' => 1, 'student_response' => 'Existing student response', 'active_tab' => 'comment']);
@@ -480,6 +821,7 @@ class MonitorFormationTest extends TestCase
             $this->assertArrayHasKey('evaluation_initiale', $exception->errors());
         }
     }
+
     public function test_initial_evaluation_fiche_reuses_the_existing_document_evaluation_record(): void
     {
         $base = '/api/monitor/formation/'.$this->student->id.'/initial-evaluation';
@@ -533,6 +875,7 @@ class MonitorFormationTest extends TestCase
         $evaluation->update(['data' => $stored]);
         $this->putJson($base, ['data' => $data])->assertStatus(423);
     }
+
     public function test_initial_evaluation_questions_persist_in_the_existing_evaluation_and_sync_supported_fiche_values(): void
     {
         $base = '/api/monitor/formation/'.$this->student->id.'/initial-evaluation/questions';

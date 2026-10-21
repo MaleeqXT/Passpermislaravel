@@ -30,7 +30,7 @@ class FirstHourSatisfactionNotification extends Notification implements ShouldQu
             ->subject('Votre avis sur votre formation PassPermisFacile')
             ->greeting('Bonjour,')
             ->line($message)
-            ->action('Donner mon avis', rtrim(config('satisfaction.frontend_url'), '/') . '/satisfaction')
+            ->action('Donner mon avis', rtrim(config('satisfaction.frontend_url'), '/') . '/satisfaction?stage=' . urlencode($this->stage))
             ->line('Merci de prendre quelques minutes pour répondre à notre enquête de satisfaction.')
             ->salutation('L’équipe PassPermisFacile');
     }

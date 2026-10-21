@@ -12,7 +12,11 @@ class SatisfactionNotification extends Model
 
     protected $guarded = [];
 
-    protected $casts = ['read_at' => 'datetime'];
+    protected $casts = [
+        'read_at' => 'datetime',
+        'last_email_attempt_at' => 'datetime',
+        'email_sent_at' => 'datetime',
+    ];
 
     public function candidate()
     {

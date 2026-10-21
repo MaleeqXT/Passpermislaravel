@@ -17,20 +17,53 @@ class SatisfactionController extends Controller
     {
         $student = $this->resolveAuthenticatedStudent($request);
         if (!$student) return response()->json(['data' => null]);
-        $response = $lifecycle->evaluate($student);
-        $response = $response?->load('survey.questions');
-        $survey = $response?->survey;
-        if ($survey) {
-            $survey->completed = false;
-            $survey->response_id = $response->id;
-            $survey->offer_id = $response->offer_id;
-        }
+        $lifecycle->evaluateAll($student);
+        return response()->json(['data' => $this->pendingSurveys($student)->first()]);
+    }
+
+    public function pending(Request $request, SatisfactionLifecycleService $lifecycle)
+    {
+        $student = $this->resolveAuthenticatedStudent($request);
+        abort_unless($student, 403);
+
+        $lifecycle->evaluateAll($student);
+        return response()->json(['data' => $this->pendingSurveys($student)->values()]);
+    }
+
+    public function show(Request $request, SatisfactionSurvey $survey)
+    {
+        $student = $this->resolveAuthenticatedStudent($request);
+        abort_unless($student, 403);
+
+        $response = SatisfactionResponse::query()
+            ->where('survey_id', $survey->id)
+            ->where('candidate_id', $student->id)
+            ->first();
+        abort_unless($response, 403);
+
+        $survey->load(['questions' => fn($q) => $q->where('is_active', true)->orderBy('sort_order')]);
+        $survey->setAttribute('completed', $response->status === 'completed');
+        $survey->setAttribute('response_id', $response->id);
         return response()->json(['data' => $survey]);
     }
 
-    public function show(SatisfactionSurvey $survey)
+    public function stage(Request $request, string $stage)
     {
-        return response()->json(['data' => $survey->load(['questions' => fn($q) => $q->where('is_active', true)->orderBy('sort_order')])]);
+        abort_unless(in_array($stage, ['before_training', 'during_training', 'after_training'], true), 404);
+        $student = $this->resolveAuthenticatedStudent($request);
+        abort_unless($student, 403);
+
+        $response = SatisfactionResponse::query()
+            ->with(['survey.questions' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])
+            ->where('candidate_id', $student->id)
+            ->whereHas('survey', fn ($query) => $query->where('stage', $stage))
+            ->first();
+        abort_unless($response, 404);
+
+        $survey = $response->survey;
+        $survey->setAttribute('completed', $response->status === 'completed');
+        $survey->setAttribute('response_id', $response->id);
+        return response()->json(['data' => $survey]);
     }
 
     public function unreadNotification(Request $request)
@@ -72,11 +105,22 @@ class SatisfactionController extends Controller
         }
         foreach ($questions as $q) if ($q->is_required && !isset($seen[$q->id])) throw ValidationException::withMessages(['answers'=>'Toutes les questions obligatoires doivent être renseignées.']);
         $response = DB::transaction(function () use ($survey,$student,$answers,$request) {
-            $r = SatisfactionResponse::where(['survey_id'=>$survey->id,'candidate_id'=>$student->id,'status'=>'started'])->latest()->lockForUpdate()->first();
-            if (! $r) throw ValidationException::withMessages(['survey'=>'Cette enquête n’est pas disponible pour cette offre.']);
+            // Lock the one durable response first, then inspect its state.
+            // Filtering by `started` before the lock would leave a narrow
+            // double-submit race between two browser tabs.
+            $r = SatisfactionResponse::query()
+                ->where('survey_id', $survey->id)
+                ->where('candidate_id', $student->id)
+                ->lockForUpdate()
+                ->first();
+            if (! $r || $r->status !== 'started') {
+                throw ValidationException::withMessages([
+                    'survey' => 'Vous avez déjà répondu à cette enquête.',
+                ]);
+            }
             $google = collect($answers)->first(fn($a) => ($a['selected_option'] ?? null) !== null);
             $choice = match ($google['selected_option'] ?? null) { 'Oui'=>'yes', 'Plus tard'=>'later', 'Non'=>'no', default=>$request->input('google_choice') };
-            $r = $r ?: new SatisfactionResponse; $r->fill(['survey_id'=>$survey->id,'candidate_id'=>$student->id,'status'=>'completed','submitted_at'=>now(),'google_choice'=>$choice]); $r->save();
+            $r->fill(['status'=>'completed','submitted_at'=>now(),'google_choice'=>$choice]); $r->save();
             foreach ($answers as $a) SatisfactionAnswer::updateOrCreate(['response_id'=>$r->id,'question_id'=>$a['question_id']],['rating'=>$a['rating']??null,'selected_option'=>$a['selected_option']??null,'answer_text'=>$a['answer_text']??null]); return $r;
         });
         SatisfactionNotification::query()
@@ -118,7 +162,8 @@ class SatisfactionController extends Controller
 
     public function googleClick(Request $request, SatisfactionResponse $response)
     {
-        abort_unless($response->candidate_id === optional($request->user()->student)->id, 403);
+        $student = $this->resolveAuthenticatedStudent($request);
+        abort_unless($student && $response->candidate_id === $student->id, 403);
         if ($response->status !== 'completed' || $response->survey?->stage !== 'after_training' || $response->google_choice !== 'yes') return response()->json(['message'=>'Google review is not available.'], 422);
         $response->update(['google_clicked'=>true,'google_clicked_at'=>now()]); return response()->json(['data'=>['google_review_url'=>config('satisfaction.google_review_url')]]);
     }
@@ -137,5 +182,23 @@ class SatisfactionController extends Controller
         $ratings=SatisfactionAnswer::whereNotNull('rating'); $by=SatisfactionSurvey::get()->map(fn($s)=>['survey'=>$s->slug,'average'=>SatisfactionAnswer::whereHas('response',fn($r)=>$r->where('survey_id',$s->id)->where('status','completed'))->avg('rating')]);
         $questions=SatisfactionAnswer::select('question_id',DB::raw('COUNT(*) responses'),DB::raw('AVG(rating) average'),DB::raw('SUM(rating=1) one_star'),DB::raw('SUM(rating=2) two_star'),DB::raw('SUM(rating=3) three_star'),DB::raw('SUM(rating=4) four_star'),DB::raw('SUM(rating=5) five_star'))->whereNotNull('rating')->groupBy('question_id')->with('question.survey')->get();
         return response()->json(['data'=>['total_responses'=>SatisfactionResponse::where('status','completed')->count(),'overall_average'=>$ratings->avg('rating'),'total_rating_answers'=>$ratings->count(),'by_survey'=>$by,'per_question'=>$questions,'rating_distribution'=>$ratings->select('rating',DB::raw('count(*) total'))->groupBy('rating')->pluck('total','rating'),'google'=>['yes'=>SatisfactionResponse::where('google_choice','yes')->count(),'later'=>SatisfactionResponse::where('google_choice','later')->count(),'no'=>SatisfactionResponse::where('google_choice','no')->count(),'clicked'=>SatisfactionResponse::where('google_clicked',true)->count()]]]);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, SatisfactionSurvey> */
+    private function pendingSurveys(Student $student)
+    {
+        return SatisfactionResponse::query()
+            ->with(['survey.questions' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])
+            ->where('candidate_id', $student->id)
+            ->where('status', 'started')
+            ->latest()
+            ->get()
+            ->map(function (SatisfactionResponse $response) {
+                $survey = $response->survey;
+                $survey->setAttribute('completed', false);
+                $survey->setAttribute('response_id', $response->id);
+                $survey->setAttribute('offer_id', $response->offer_id);
+                return $survey;
+            });
     }
 }

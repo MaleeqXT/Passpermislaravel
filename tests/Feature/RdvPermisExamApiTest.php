@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 use Spatie\Permission\Models\Role;
@@ -18,6 +19,7 @@ class RdvPermisExamApiTest extends TestCase
         config()->set('rdvpermis.api_url', 'https://api.example.test');
         config()->set('rdvpermis.timeout', 2);
         Http::preventStrayRequests();
+        Log::spy();
     }
 
     public function test_exam_listing_lookup_and_cancellation_use_current_v2_paths(): void
@@ -69,6 +71,50 @@ class RdvPermisExamApiTest extends TestCase
         $this->getJson('/api/rdvpermis/examens?groupePermis=CE&date=2026-10-20')->assertUnprocessable();
         $this->postJson('/api/rdvpermis/examens/permutation', ['examenId1' => 'exam-1'])->assertUnprocessable();
         Http::assertNothingSent();
+    }
+
+    public function test_permutation_preserves_distinct_source_and_target_ids_and_makes_one_provider_request(): void
+    {
+        $user = $this->signIn();
+        $this->bindToken($user, 1);
+        $url = 'https://api.example.test/api/v2/auto-ecole/examens/permutation';
+        $payload = ['examenId1' => 'selected-source-exam', 'examenId2' => 'selected-permutable-target'];
+        Http::fake([$url => Http::response('', 204)]);
+
+        $this->postJson('/api/rdvpermis/examens/permutation', $payload)->assertNoContent();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request->method() === 'POST'
+            && $request->url() === $url && $request->data() === $payload);
+    }
+
+    public function test_permutation_does_not_accept_old_english_or_missing_id_fields(): void
+    {
+        $this->signIn();
+        Http::fake();
+        foreach ([
+            ['examId1' => 'source', 'examId2' => 'target'],
+            ['examenId1' => 'source'],
+            ['examenId2' => 'target'],
+        ] as $payload) {
+            $this->postJson('/api/rdvpermis/examens/permutation', $payload)->assertUnprocessable();
+        }
+        Http::assertNothingSent();
+    }
+
+    public function test_failed_permutation_is_not_retried_or_returned_as_success(): void
+    {
+        $user = $this->signIn();
+        $this->bindToken($user, 1);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/examens/permutation' => Http::response([
+            'private' => 'must-not-be-returned',
+        ], 422)]);
+
+        $result = $this->postJson('/api/rdvpermis/examens/permutation', [
+            'examenId1' => 'source', 'examenId2' => 'target',
+        ])->assertUnprocessable()->assertJsonStructure(['message']);
+        $this->assertStringNotContainsString('must-not-be-returned', $result->getContent());
+        Http::assertSentCount(1);
     }
 
     private function signIn(): User

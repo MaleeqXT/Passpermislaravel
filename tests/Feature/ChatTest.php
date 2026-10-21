@@ -13,6 +13,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\Sanctum;
@@ -136,6 +137,61 @@ class ChatTest extends TestCase
             'client_message_id' => (string) Str::uuid(),
             'attachments' => [UploadedFile::fake()->create('document.pdf', 10, 'application/pdf')],
         ])->assertCreated()->assertJsonPath('data.message', '');
+    }
+
+    public function test_attachment_downloads_are_restricted_to_conversation_participants(): void
+    {
+        Storage::fake('public');
+        $student = $this->user('student'); $monitor = $this->user('monitor'); $outsider = $this->user('admin');
+        $this->upcomingAssignment($student, $monitor);
+        $conversation = $this->conversation($student, $monitor);
+        Sanctum::actingAs($student);
+        $this->post("/api/conversations/{$conversation->id}/messages", [
+            'attachments' => [UploadedFile::fake()->create('private.pdf', 10, 'application/pdf')],
+        ])->assertCreated();
+        $message = Message::query()->latest('id')->firstOrFail();
+        $attachment = $message->attachments()->firstOrFail();
+
+        Sanctum::actingAs($outsider);
+        $this->getJson('/api/chat/attachments/'.$attachment->id)->assertForbidden();
+        $this->getJson('/api/chat/messages/'.$message->id.'/attachment')->assertForbidden();
+
+        Sanctum::actingAs($monitor);
+        $this->get('/api/chat/attachments/'.$attachment->id)->assertOk();
+        $this->get('/api/chat/messages/'.$message->id.'/attachment')->assertOk();
+    }
+
+    public function test_participants_can_view_historical_conversation_but_cannot_send_after_their_last_lesson(): void
+    {
+        Storage::fake('public');
+        $student = $this->user('student'); $monitor = $this->user('monitor'); $outsider = $this->user('admin');
+        $this->upcomingAssignment($student, $monitor);
+        $conversation = $this->conversation($student, $monitor);
+
+        Sanctum::actingAs($student);
+        $this->post("/api/conversations/{$conversation->id}/messages", [
+            'message' => 'Message conservé après la formation.',
+            'attachments' => [UploadedFile::fake()->create('historique.pdf', 10, 'application/pdf')],
+        ])->assertCreated();
+        $message = Message::query()->latest('id')->firstOrFail();
+        $attachment = $message->attachments()->firstOrFail();
+
+        DB::table('reservations')->update([
+            'date' => now()->subDay()->toDateString(),
+            'end_at' => '10:00:00',
+        ]);
+
+        $this->getJson('/api/conversations')->assertOk()
+            ->assertJsonPath('data.0.id', $conversation->id);
+        $this->getJson("/api/conversations/{$conversation->id}/messages")->assertOk()
+            ->assertJsonPath('data.0.message', 'Message conservé après la formation.');
+        $this->get('/api/chat/attachments/'.$attachment->id)->assertOk();
+        $this->postJson("/api/conversations/{$conversation->id}/messages", ['message' => 'Nouveau message'])
+            ->assertForbidden();
+
+        Sanctum::actingAs($outsider);
+        $this->getJson("/api/conversations/{$conversation->id}/messages")->assertForbidden();
+        $this->getJson('/api/chat/attachments/'.$attachment->id)->assertForbidden();
     }
 
     public function test_cursor_pagination_and_read_watermark_do_not_mark_unseen_messages(): void

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -22,6 +23,7 @@ class RdvPermisPanierApiTest extends TestCase
         config()->set('rdvpermis.api_url', 'https://api.example.test');
         config()->set('rdvpermis.timeout', 2);
         Http::preventStrayRequests();
+        Log::spy();
     }
 
     public function test_authorized_user_can_list_paniers(): void
@@ -144,6 +146,20 @@ class RdvPermisPanierApiTest extends TestCase
                 'contientAuMoinsUneErreur' => true,
                 'data' => [['creneauId' => 'slot-1', 'codeMessage' => 'CANDIDAT_SOUS_PENALITE', 'estReserve' => false]],
             ]],
+            'mixed partial result preserves every nested outcome' => [207, [
+                'panierId' => self::PANIER_ID,
+                'contientAuMoinsUneErreur' => true,
+                'data' => [
+                    ['creneauId' => 'slot-1', 'examenId' => 'created-exam', 'estReserve' => true],
+                    ['creneauId' => 'slot-2', 'estReserve' => false, 'codeMessage' => 'CANDIDAT_SOUS_PENALITE',
+                        'details' => ['raisons' => ['fixture business refusal']]],
+                ],
+            ]],
+            'HTTP 200 business refusal is preserved without inventing success' => [200, [
+                'contientAuMoinsUneErreur' => true,
+                'data' => [['creneauId' => 'slot-1', 'estReserve' => false]],
+            ]],
+            'unknown response stays unknown' => [200, []],
         ];
     }
 

@@ -16,6 +16,7 @@ use App\Http\Controllers\V1\Inertia\Student\Infrastructure\Training\HourRequestC
 use App\Http\Controllers\V1\EndPoint\Student\Document\StudentDocumentController;
 use App\Http\Controllers\SatisfactionController;
 use App\Http\Controllers\V1\EndPoint\Student\Exam\StudentExamController;
+use App\Http\Controllers\V1\EndPoint\Admin\StudentDashboardPreviewController;
 use App\Http\Controllers\V1\EndPoint\Student\StudentProgressController;
 use App\Http\Controllers\V1\EndPoint\Student\StudentFormationController;
 use App\Http\Controllers\V1\EndPoint\Bilan\BilanController;
@@ -34,6 +35,8 @@ use App\Http\Controllers\Theory\TheoryStudentController;
 */
 
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'slow'])->group(function () {
+    Route::delete('/preview-session', [StudentDashboardPreviewController::class, 'stop'])
+        ->name('student.preview-session.stop');
     Route::prefix('theory')->controller(TheoryStudentController::class)->group(function () {
         Route::get('/access', 'access');
         Route::get('/dashboard', 'dashboard');
@@ -72,6 +75,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     Route::prefix('satisfaction')->controller(SatisfactionController::class)->group(function () {
         Route::get('/available', 'available');
+        Route::get('/pending', 'pending');
+        Route::get('/stage/{stage}', 'stage');
         Route::get('/notifications/unread', 'unreadNotification');
         Route::post('/notifications/{notification}/read', 'markNotificationRead');
         Route::get('/{survey}', 'show');

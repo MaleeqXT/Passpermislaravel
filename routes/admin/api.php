@@ -51,6 +51,8 @@ use App\Http\Controllers\V1\Inertia\System\Promo\OffresController;
 use App\Http\Controllers\V1\Inertia\Student\Sale\AdminCartController;
 use App\Http\Controllers\V1\Inertia\Student\Infrastructure\Training\AdminCancellationController;
 use App\Http\Controllers\V1\EndPoint\Admin\Exam\AdminExamController;
+use App\Http\Controllers\V1\EndPoint\Admin\ManeuverCatalogController;
+use App\Http\Controllers\V1\EndPoint\Admin\StudentDashboardPreviewController;
 
 
 /*
@@ -79,7 +81,9 @@ Route::prefix('locations')->name('locations.')
     });
 });
 
-Route::middleware(['auth:sanctum', 'role:admin|secretary', config('jetstream.auth_session'), 'verified', 'slow'])->group(function () {
+Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('jetstream.auth_session'), 'verified', 'slow'])->group(function () {
+      Route::post('students/{student}/preview-session', [StudentDashboardPreviewController::class, 'start'])
+          ->name('students.preview-session.start');
       Route::prefix('theory')->controller(TheoryAdminController::class)->group(function () {
           Route::get('/categories', 'categories');
           Route::get('/statistics', 'statistics');
@@ -474,3 +478,13 @@ Route::middleware(['auth:sanctum', 'role:admin|secretary', config('jetstream.aut
 
     Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
 });
+
+// Catalogue pédagogique: only administrators may change it.  Entries are
+// deactivated instead of deleted so lesson history remains intact.
+Route::middleware(['auth:sanctum', 'role:admin|super-admin', config('jetstream.auth_session'), 'verified', 'slow'])
+    ->prefix('maneuvers')->name('maneuvers.')->controller(ManeuverCatalogController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{maneuver}', 'update')->name('update');
+        Route::delete('/{maneuver}', 'destroy')->name('destroy');
+    });
