@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use App\Services\SatisfactionLifecycleService;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Srmklive\PayPal\Services\PayPal as PayPalClient;
@@ -170,6 +171,10 @@ class PaymentService implements PaymentInterface
                 ]);
 
                 DB::commit();
+                // The lifecycle is idempotent. This gives a confirmed PayPal
+                // driving-package purchase the same immediate Before-survey
+                // opportunity as a confirmed Stripe purchase.
+                app(SatisfactionLifecycleService::class)->evaluateAll(auth()->user()->student->fresh());
                 return redirect()
                     ->route('student.shop.index')
                     ->with('success', 'Transaction complete.');

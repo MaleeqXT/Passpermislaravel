@@ -128,9 +128,9 @@ class SatisfactionController extends Controller
             ->where('response_id', $response->id)
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
-        // If later lifecycle conditions were already met, prepare only the
-        // next stage now that this one is completed.
-        app(SatisfactionLifecycleService::class)->evaluate($student);
+        // If other lifecycle conditions are already met, preserve every
+        // independently eligible pending stage now that this one is complete.
+        app(SatisfactionLifecycleService::class)->evaluateAll($student);
         $payload = $response->load('answers');
         $payload->google_review_url = $response->google_choice === 'yes' ? config('satisfaction.google_review_url') : null;
         return response()->json(['data'=>$payload], 201);

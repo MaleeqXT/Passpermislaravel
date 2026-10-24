@@ -931,8 +931,10 @@ class PaymentService
             ]);
 
             DB::commit();
-            // A confirmed paid sale is the only Before-survey trigger.
-            app(SatisfactionLifecycleService::class)->evaluate($student->fresh());
+            // A confirmed paid sale can unlock one or more pending lifecycle
+            // stages. The service is idempotent, so a retry cannot duplicate
+            // a response, dashboard notification, or email.
+            app(SatisfactionLifecycleService::class)->evaluateAll($student->fresh());
             session()->flash('success', 'Payment completed.');
             return response()->json([
                 'success' => $status,

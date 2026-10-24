@@ -3,6 +3,7 @@
 namespace App\Services\Theory;
 
 use App\Enums\V2\Student\Schedule\Offre\OffreTypeStatusEnum;
+use App\Enums\V2\Student\Schedule\Offre\OffreTypeEnum;
 use App\Enums\V2\Student\Schedule\Sale\SaleStatusEnum;
 use App\Models\Theory\TheoryManualCodeAccess;
 use App\Models\Roles\Admin\Offer\Order\Sale;
@@ -24,7 +25,10 @@ class TheoryCodeAccessService
             ->where('payment_status', SaleStatusEnum::PAID->value)
             ->whereHas('cart.cartDetails.offer', function ($query) {
                 // A withdrawn package must remain usable by students who already paid.
-                $query->withTrashed()->where('type', OffreTypeStatusEnum::CODE->value);
+                $query->withTrashed()->where(function ($offer) {
+                    $offer->where('type', OffreTypeStatusEnum::CODE->value)
+                        ->orWhere('type_offre', OffreTypeEnum::CODE_ONLINE->value);
+                });
             })
             ->exists();
     }

@@ -39,13 +39,13 @@ class SatisfactionOfferTriggerService
             return false;
         }
 
-        return (bool) app(SatisfactionLifecycleService::class)->evaluate($student);
+        return app(SatisfactionLifecycleService::class)->evaluateAll($student)->isNotEmpty();
     }
 
     public function evaluateOffer(Student $student, string $offerId): bool
     {
         // Kept for existing callers; lifecycle decisions are student-level.
-        return (bool) app(SatisfactionLifecycleService::class)->evaluate($student);
+        return app(SatisfactionLifecycleService::class)->evaluateAll($student)->isNotEmpty();
 
         $offer = Offer::query()->find($offerId);
         $totalHours = (float) ($offer?->balance ?? 0);

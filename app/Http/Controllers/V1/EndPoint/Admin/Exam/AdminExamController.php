@@ -72,7 +72,7 @@ class AdminExamController extends Controller
         $exam->save();
 
         // date_examen is the authoritative staff-confirmed exam assignment.
-        app(SatisfactionLifecycleService::class)->evaluate($student->fresh());
+        app(SatisfactionLifecycleService::class)->evaluateAll($student->fresh());
 
         $student = $this->studentsQuery()->findOrFail($student->id);
 

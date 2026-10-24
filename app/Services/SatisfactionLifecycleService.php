@@ -3,9 +3,10 @@
 namespace App\Services;
 
 use App\Enums\V2\Student\Schedule\Sale\SaleStatusEnum;
-use App\Enums\V2\Student\Schedule\Sale\SalePaymentMethodEnum;
 use App\Enums\V2\Student\Schedule\Cancellation\CancellationStatusEnum;
 use App\Enums\V2\Student\Examen\ExamenStatusEnum;
+use App\Enums\V2\Student\Schedule\Offre\OffreTypeEnum;
+use App\Enums\V2\Student\Schedule\Offre\OffreTypeStatusEnum;
 use App\Models\Roles\Admin\Offer\Order\Sale;
 use App\Models\Roles\Monitor\Schedule\ReviewMonitor;
 use App\Models\Roles\Student\User\Student;
@@ -16,13 +17,10 @@ use App\Notifications\V1\Student\Satisfaction\FirstHourSatisfactionNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
 
 class SatisfactionLifecycleService
 {
-    private const BEFORE_EVALUATION_OFFER_IDS = [
-        '84aeacd3-a396-11f1-a172-9840bb4923f7', // Pass permis Heure d’évaluation BM
-        '9eec8bb6-af81-4846-b729-5c646ead54f4', // Pass permis Heure d’évaluation BA
-    ];
 
     /**
      * Reconcile the next applicable survey. This may be called safely after a
@@ -66,7 +64,7 @@ class SatisfactionLifecycleService
     private function eligible(Student $student, string $stage): bool
     {
         return match ($stage) {
-            'before_training' => $this->hasConfirmedEvaluationPurchase($student),
+            'before_training' => $this->hasConfirmedDrivingPackagePurchase($student),
             'during_training' => $this->hasReachedTrainingThreshold($student),
             // An assigned date is only an actionable appointment while it is
             // still pending and has not received a final result. Staff clears
@@ -90,14 +88,47 @@ class SatisfactionLifecycleService
             ->exists();
     }
 
-    private function hasConfirmedEvaluationPurchase(Student $student): bool
+    /**
+     * A Before survey belongs to the student's driving enrolment, not to a
+     * particular Stripe payment intent.  Paid cash, bank-transfer and PayPal
+     * packages are just as confirmed as a paid Stripe package.  A package is
+     * identified from the offer itself so an unrelated code product can never
+     * unlock the driving-training questionnaire.
+     */
+    private function hasConfirmedDrivingPackagePurchase(Student $student): bool
     {
         return Sale::query()
             ->where('student_id', $student->id)
             ->where('payment_status', SaleStatusEnum::PAID->value)
-            ->where('payment_method', SalePaymentMethodEnum::STRIP->value)
-            ->where('payment_id', 'like', 'pi_%')
-            ->whereHas('cart.cartDetails', fn ($query) => $query->whereIn('offer_id', self::BEFORE_EVALUATION_OFFER_IDS))
+            // A paid invoice remains proof of purchase even when staff later
+            // archives its cart, cart line, or offer.  The normal cart scope
+            // hides CPF carts, but it must not hide a confirmed purchase from
+            // this lifecycle check.
+            ->whereHas('cart', function (Builder $cart) {
+                $cart->withoutGlobalScopes()
+                    ->withTrashed()
+                    ->whereHas('cartDetails', function (Builder $cartDetails) {
+                        $cartDetails->withTrashed()
+                            ->whereHas('offer', function (Builder $query) {
+                                $legacyFirstHourOfferIds = array_values(array_filter(
+                                    (array) config('satisfaction.before_training_first_hour_offer_ids', [])
+                                ));
+
+                                // Include first-hour/evaluation offers (€38/€45) through the
+                                // explicit business flag, even if legacy records predate the
+                                // normal driving-package categorisation.
+                                $query->withTrashed()->where(function ($offer) use ($legacyFirstHourOfferIds) {
+                                    $offer->where('is_evaluation', true)
+                                        ->orWhere(function ($drivingPackage) {
+                                            $drivingPackage
+                                                ->where('type', OffreTypeStatusEnum::CONDUITE->value)
+                                                ->where('type_offre', OffreTypeEnum::FORFAIT->value);
+                                        })
+                                        ->when($legacyFirstHourOfferIds, fn ($legacy) => $legacy->orWhereIn('id', $legacyFirstHourOfferIds));
+                                });
+                            });
+                    });
+            })
             ->exists();
     }
 
@@ -143,8 +174,13 @@ class SatisfactionLifecycleService
     private function duringThreshold(int $totalMinutes): int
     {
         // The default is 75%: 20h => 15h, 10h => 7h30. Durations are kept in
-        // minutes so a 45-minute lesson never gets rounded away.
-        return (int) ceil($totalMinutes * 0.75);
+        // minutes so a 45-minute lesson never gets rounded away. An operator
+        // can adjust SATISFACTION_DURING_THRESHOLD_PERCENT without changing
+        // business code.
+        $percentage = (float) config('satisfaction.during_training_threshold_percent', 75);
+        $percentage = min(100, max(0, $percentage));
+
+        return (int) ceil($totalMinutes * ($percentage / 100));
     }
 
     private function activate(Student $student, string $stage): ?SatisfactionResponse
