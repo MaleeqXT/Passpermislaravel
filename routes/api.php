@@ -24,6 +24,7 @@ use App\Http\Controllers\V1\EndPoint\Student\User\Wallet\WalletController;
 use App\Http\Controllers\V1\EndPoint\System\Media\MediaController;
 use App\Http\Controllers\V1\EndPoint\System\Promo\PromoController;
 use App\Http\Controllers\V1\EndPoint\System\User\AuthLogController;
+use App\Http\Controllers\V1\EndPoint\System\User\PublicPasswordResetController;
 use App\Http\Controllers\V1\EndPoint\System\Zone\ZoneController;
 use App\Http\Controllers\V1\Inertia\Admin\AdminCancellationController2;
 use App\Http\Controllers\V1\Inertia\CPF\CPFPagesController;
@@ -87,8 +88,11 @@ Route::prefix('auth')->name('auth.')
 // Public website contact form: stores rows in contact_us.
 Route::post('/contacts', [ContactController::class, 'apiStore']);
 Route::post('/public/register/student', [StudentsController::class, 'store']);
+Route::post('/public/auth/forgot-password', [PublicPasswordResetController::class, 'sendLink']);
+Route::post('/public/auth/reset-password', [PublicPasswordResetController::class, 'reset']);
 Route::get('/public/offers', [OffersController::class, 'apiIndex']);
 Route::get('/public/cpf/zones', [CPFPagesController::class, 'publicZones']);
+Route::post('/public/cpf/requests', [CPFPagesController::class, 'storePublicRequest']);
 Route::post('/public/cpf/positioning', [CPFPagesController::class, 'storePublicPositioning']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthLogController::class, 'getAuthUser']);

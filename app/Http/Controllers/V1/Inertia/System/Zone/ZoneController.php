@@ -20,6 +20,7 @@ use App\Repository\V2\Admin\Zone\StoreZoneRepo;
 use App\Repository\V2\Monitor\Zone\AttachLieuToMonitorRepo;
 use App\Repository\V2\Monitor\Zone\DetachLieuToMonitorRepo;
 use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -147,12 +148,18 @@ class  ZoneController extends Controller
      * @return RedirectResponse
      * @throws Exception
      */
-    public function attachZoneToEleve(Student $student, AttachOrDetachZoneToEleveRequest $request): RedirectResponse
+    public function attachZoneToEleve(Student $student, AttachOrDetachZoneToEleveRequest $request): RedirectResponse|JsonResponse
     {
         DB::beginTransaction();
         try {
             $status = AttachZoneToStudentRepo::run($student, $request->validated());
             DB::commit();
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'student' => $student->fresh()->load('zones.lieux'),
+                ]);
+            }
             session()->flash('success', flashMessage());
             // return
 
@@ -193,12 +200,18 @@ class  ZoneController extends Controller
      * @return RedirectResponse
      * @throws Exception
      */
-    public function detachZoneToEleve(Student $student, AttachOrDetachZoneToEleveRequest $request): RedirectResponse
+    public function detachZoneToEleve(Student $student, AttachOrDetachZoneToEleveRequest $request): RedirectResponse|JsonResponse
     {
         DB::beginTransaction();
         try {
             $status = DetachZoneToStudentRepo::run($student, $request->validated());
             DB::commit();
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'student' => $student->fresh()->load('zones.lieux'),
+                ]);
+            }
             session()->flash('success', flashMessage());
             // return
 

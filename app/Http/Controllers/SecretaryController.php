@@ -323,4 +323,19 @@ class SecretaryController extends Controller
             'data' => $secretary,
         ]);
     }
+
+    /** Archive (2) or restore (1) a secretary without requiring the full profile form. */
+    public function updateStatus(Request $request, Secretary $secretary)
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'integer', 'in:1,2'],
+        ]);
+
+        $secretary->update(['status' => $validated['status']]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $secretary->fresh()->load('user'),
+        ]);
+    }
 }

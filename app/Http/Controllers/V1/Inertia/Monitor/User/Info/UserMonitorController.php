@@ -28,9 +28,21 @@ use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class UserMonitorController extends Controller
 {
+    /**
+     * API list used by administrative filters such as satisfaction reporting.
+     *
+     * Keep this response as the paginator itself: consumers of the existing
+     * endpoint expect Laravel's { data, current_page, last_page } shape.
+     */
+    public function getAllMoniteurs(): JsonResponse
+    {
+        return response()->json(FetchAllMonitorRepo::run(request()->all()));
+    }
+
     /**
      * @return Response
      * @throws ContainerExceptionInterface
@@ -61,8 +73,9 @@ class UserMonitorController extends Controller
             });
 
             $activeCount = (clone $monitorsForSelectedZone)->where('status', 1)->count();
-            $archiveCount = (clone $monitorsForSelectedZone)->where('status', 2)->count();
+            $inactiveCount = (clone $monitorsForSelectedZone)->where('status', 2)->count();
             $inhold = (clone $monitorsForSelectedZone)->where('status', 3)->count();
+            $archivedCount = (clone $monitorsForSelectedZone)->where('status', 4)->count();
             $countAll = (clone $monitorsForSelectedZone)->count();
             // return response()->json("hellooo hello");
             return response()->json([
@@ -74,7 +87,8 @@ class UserMonitorController extends Controller
                 // 'inhold_count'=>Monitor::where('status',3)->count(),
                 'active_count' => $activeCount,
 
-                'inactive_count' => $archiveCount,
+                'inactive_count' => $inactiveCount,
+                'archived_count' => $archivedCount,
 
                 'inhold_count' =>$inhold,
                 'all_count' => $countAll,
@@ -104,13 +118,18 @@ class UserMonitorController extends Controller
      * @param Monitor $monitor
      * @return Response
      */
-    public function invoices(Monitor $monitor): Response
+    public function invoices(Monitor $monitor)
     {
+        $payload = [
+            'invoices' => FetchAllInvoiceRepo::run(array_merge(request()->all(), ['monitor_id' => $monitor->id])),
+            'monitor' => $monitor->load('user'),
+        ];
 
-        return Inertia::render('features/roles/monitors/view/MonitorInvoicesPage', [
-            'invoices' =>  FetchAllInvoiceRepo::run(array_merge(request()->all(), ['monitor_id' => $monitor->id])),
-            'monitor' => $monitor->load('user')
-        ]);
+        if (request()->expectsJson()) {
+            return response()->json($payload);
+        }
+
+        return Inertia::render('features/roles/monitors/view/MonitorInvoicesPage', $payload);
     }
 
 
@@ -193,11 +212,11 @@ public function store(StoreOrUpdateMonitorRequest $request)
             ]);
 }
 
-    /** Move a monitor between Active (1), Inactif (2) and En attente (3). */
+    /** Move a monitor between Active (1), Inactif (2), En attente (3) and Archivé (4). */
     public function updateStatus(Request $request, Monitor $monitor)
     {
         $validated = $request->validate([
-            'status' => ['required', 'integer', 'in:1,2,3'],
+            'status' => ['required', 'integer', 'in:1,2,3,4'],
         ]);
 
         $monitor->update(['status' => $validated['status']]);

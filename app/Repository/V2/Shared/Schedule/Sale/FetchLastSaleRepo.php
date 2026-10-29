@@ -12,10 +12,10 @@ class FetchLastSaleRepo
      * @param array|null $attributes
      * @return Collection
      */
-    public static function run(array $attributes = null): Collection
+    public static function run(array $attributes = null, ?array $relations = null): Collection
     {
         return Sale::query()
-            ->with('student', 'student.user', 'cart', 'cart.cartDetails')
+            ->with($relations ?? ['student', 'student.user', 'cart', 'cart.cartDetails'])
             ->where('payment_status', SaleStatusEnum::PAID->value)
             ->when(!empty($attributes['zone_id']), fn ($query) => $query->whereHas('student.user', fn ($userQuery) => $userQuery->where('zone_id', $attributes['zone_id'])))
             ->orderByDesc('created_at')

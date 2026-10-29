@@ -17,7 +17,7 @@ class FetchReservationDashboardRepo
     public static function run(array $attributes, array $with = [])
     {
         return Reservation::query()
-            ->with(array_merge([
+            ->with($with ?: [
                 'training.student.user',
                 'training.cancellation',
                 'training.student' => fn($query) => $query->realiseHours(),
@@ -25,7 +25,7 @@ class FetchReservationDashboardRepo
                 'lieu.zone',
                 'reviewMonitor.monitor.user',
                 'monitor.user:id,name',
-            ]))
+            ])
             ->select('*', DB::raw('DATE(date) as datef'))
             ->whereHas('training')
             ->when(isset($attributes['monitor_id']), fn($query) => self::applyMonitoFilter($query, $attributes))

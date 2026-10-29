@@ -15,12 +15,18 @@ class StudentsSalesExport implements FromCollection, WithHeadings, ShouldAutoSiz
     {
         $rows = [];
 
-        $students = Student::with('user', 'sales.cart.cartDetails.offer', 'wallets.offer')->get();
+        // Load every relation used below once. Calling relationship methods inside
+        // this loop caused one or more additional queries for each student and
+        // made the global Excel export unnecessarily slow.
+        $students = Student::with([
+            'user',
+            'sales.cart.cartDetails.offer',
+            'wallets',
+        ])->get();
 
         foreach ($students as $student) {
-            $walletBalance = $student->wallets()->sum('balance') ?? 0;
-
-            $sales = $student->sales()->with('cart.cartDetails.offer')->get();
+            $walletBalance = $student->wallets->sum('balance');
+            $sales = $student->sales;
 
             if ($sales->isEmpty()) {
                 // row for student with no sales

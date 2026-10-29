@@ -107,10 +107,39 @@ class CPFPagesController extends Controller
         ]);
     }
 
+    /** Store the initial public CPF request before the positioning test begins. */
+    public function storePublicRequest(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'cpf_document_info_id' => ['nullable', 'uuid', 'exists:c_p_f_document_infos,id'],
+            'test_pro' => ['required', 'array'],
+            'test_pro.name' => ['required', 'string', 'max:150'],
+            'test_pro.email' => ['required', 'email', 'max:255'],
+            'test_pro.phone' => ['required', 'string', 'max:40'],
+            'test_pro.zone_id' => ['required', 'exists:zones,id'],
+            'test_pro.zone_name' => ['required', 'string', 'max:150'],
+            'test_pro.recall_preference' => ['nullable', 'string', 'max:255'],
+            'test_pro.available_days' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $info = filled($data['cpf_document_info_id'] ?? null)
+            ? CPFDocumentInfo::query()->findOrFail($data['cpf_document_info_id'])
+            : new CPFDocumentInfo();
+
+        $info->test_pro = array_merge($info->test_pro ?? [], $data['test_pro']);
+        $info->save();
+
+        return response()->json([
+            'message' => 'Votre demande CPF a été enregistrée. Vous pouvez poursuivre le test de positionnement.',
+            'data' => $info->fresh(),
+        ], $info->wasRecentlyCreated ? 201 : 200);
+    }
+
     /** Store the completed public CPF positioning form. */
     public function storePublicPositioning(Request $request): JsonResponse
     {
         $data = $request->validate([
+            'cpf_document_info_id' => ['nullable', 'uuid', 'exists:c_p_f_document_infos,id'],
             'test_pro' => ['required', 'array'],
             'test_pro.name' => ['required', 'string', 'max:150'],
             'test_pro.email' => ['required', 'email', 'max:255'],
@@ -123,9 +152,12 @@ class CPFPagesController extends Controller
             'test_pro.answers' => ['required', 'array'],
         ]);
 
-        $info = CPFDocumentInfo::query()->create([
-            'test_pro' => $data['test_pro'],
-        ]);
+        $info = filled($data['cpf_document_info_id'] ?? null)
+            ? CPFDocumentInfo::query()->findOrFail($data['cpf_document_info_id'])
+            : new CPFDocumentInfo();
+
+        $info->test_pro = array_merge($info->test_pro ?? [], $data['test_pro']);
+        $info->save();
 
         return response()->json([
             'message' => 'Votre demande CPF a été enregistrée avec succès.',
@@ -286,6 +318,7 @@ class CPFPagesController extends Controller
      */
     public function attestationHonneurPdf(CPFDocumentInfo $CPFDocumentInfo)
     {
+        $CPFDocumentInfo = $this->prepareCpfPdfData($CPFDocumentInfo);
 
         $pdf = Pdf::loadView('pdf.cpf.attestation-honneur', ['data' => $CPFDocumentInfo])->setPaper('A5');
 
@@ -299,6 +332,7 @@ class CPFPagesController extends Controller
      */
     public function storeTestPosPdf(CPFDocumentInfo $CPFDocumentInfo)
     {
+        $CPFDocumentInfo = $this->prepareCpfPdfData($CPFDocumentInfo);
 
         $pdf = Pdf::loadView('pdf.cpf.test-pos', ['data' => $CPFDocumentInfo])->setPaper('A5');
 
@@ -312,6 +346,8 @@ class CPFPagesController extends Controller
      */
     public function contactFormationPdf(CPFDocumentInfo $CPFDocumentInfo)
     {
+        $CPFDocumentInfo = $this->prepareCpfPdfData($CPFDocumentInfo);
+
         $CPFoffres = [
             'manual' => [
                 1 => [
@@ -413,7 +449,13 @@ class CPFPagesController extends Controller
         ];
 
 
-        $offre = $CPFoffres[$CPFDocumentInfo?->boite['id'] ?? null][$CPFDocumentInfo?->offre] ?? null;
+        $boxId = is_array($CPFDocumentInfo->boite) ? ($CPFDocumentInfo->boite['id'] ?? null) : null;
+        $offre = $CPFoffres[$boxId][$CPFDocumentInfo->offre] ?? [
+            'name' => is_scalar($CPFDocumentInfo->offre) && $CPFDocumentInfo->offre !== ''
+                ? $CPFDocumentInfo->offre
+                : 'Formation CPF',
+            'price_with_code' => '—',
+        ];
         $pdf = Pdf::loadView('pdf.cpf.contact-formation', ['data' => $CPFDocumentInfo, 'offre' => $offre])->setPaper('A5');
 
         return $pdf->stream('contrat-formation.pdf');
@@ -438,9 +480,53 @@ class CPFPagesController extends Controller
      */
     public function reservationsPdf(CPFDocumentInfo $CPFDocumentInfo)
     {
+        $CPFDocumentInfo = $this->prepareCpfPdfData($CPFDocumentInfo);
+
         $pdf = Pdf::loadView('pdf.cpf.reservations', ['data' => $CPFDocumentInfo])->setPaper('A5');
 
         return $pdf->stream('reservations.pdf');
+    }
+
+    /**
+     * Legacy CPF records can predate newer positioning-form fields. PDF
+     * templates still need a complete shape so a missing answer is displayed
+     * as an empty field instead of aborting document generation.
+     */
+    private function prepareCpfPdfData(CPFDocumentInfo $CPFDocumentInfo): CPFDocumentInfo
+    {
+        $test = is_array($CPFDocumentInfo->test_pro) ? $CPFDocumentInfo->test_pro : [];
+
+        foreach (['first', 'two', 'three', 'four', 'five', 'sex', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'] as $answer) {
+            $test[$answer] = array_replace(['id' => null], is_array($test[$answer] ?? null) ? $test[$answer] : []);
+        }
+
+        $test = array_replace([
+            'name' => '',
+            'date_naissance' => '',
+            'phone' => '',
+            'email' => '',
+            'type' => '',
+            'two_feedback' => '',
+            'commentaire_formateur' => '',
+            'nb_heur' => '',
+            'date_evaluation' => $CPFDocumentInfo->created_at?->toDateString() ?? now()->toDateString(),
+            'signature' => '',
+        ], $test);
+
+        $reservations = is_array($CPFDocumentInfo->reservations) ? $CPFDocumentInfo->reservations : [];
+        $CPFDocumentInfo->setAttribute('reservations', array_map(static function ($reservation) {
+            $reservation = is_array($reservation) ? $reservation : [];
+
+            return [
+                'date' => $reservation['date'] ?? '',
+                'houre' => $reservation['houre'] ?? $reservation['duration'] ?? '',
+                'start' => $reservation['start'] ?? $reservation['startTime'] ?? $reservation['start_at'] ?? '',
+                'end' => $reservation['end'] ?? $reservation['endTime'] ?? $reservation['end_at'] ?? '',
+            ];
+        }, $reservations));
+        $CPFDocumentInfo->setAttribute('test_pro', $test);
+
+        return $CPFDocumentInfo;
     }
 
     /**

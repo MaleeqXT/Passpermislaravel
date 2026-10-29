@@ -33,6 +33,7 @@ use App\Http\Controllers\V1\Inertia\CPF\CPFPagesController;
 
 use App\Http\Controllers\V1\Inertia\System\User\AdminUserController;
 use App\Http\Controllers\V1\Inertia\Student\User\StudentUserController;
+use App\Http\Controllers\V1\Inertia\Student\StudentExportController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\StudentMandateController;
 // use App\Http\Controllers\V1\Inertia\Monitor\User\Info\UserMonitorController;
 use App\Http\Controllers\V1\Inertia\Monitor\User\Info\InformationMonitorController;
@@ -192,6 +193,7 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
             Route::post('/', [SecretaryController::class, 'store'])->name('store');  // save new secretary
             Route::get('/{secretary}', [SecretaryController::class, 'show'])->name('show'); //geting user by id
             Route::post('/update/{secretary}', [SecretaryController::class, 'update'])->name('update');
+            Route::put('/{secretary}/status', [SecretaryController::class, 'updateStatus'])->name('update-status');
 
         });
 
@@ -215,6 +217,9 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
             });
 
         // ----- Students -----
+        Route::get('students/export-all', [StudentExportController::class, 'exportAll'])
+            ->name('students.export.all');
+
         Route::get('users/students/{student}/contract', [StudentUserController::class, 'contract'])
             ->name('users.students.contract');
 
@@ -234,8 +239,14 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
                     Route::get('/docs', 'docs')->name('docs');
                     Route::put('/', 'update')->name('update');
                     Route::post('/', 'archiveEleve')->name('archive');
+                    Route::delete('/', 'destroy')->name('destroy');
                 });
             });
+
+        Route::prefix('locations/students/{student}')->controller(ZoneController::class)->group(function () {
+            Route::post('/attach', 'attachZoneToEleve')->name('locations.students.attach');
+            Route::post('/detach', 'detachZoneToEleve')->name('locations.students.detach');
+        });
 
 
         Route::prefix('{user}')->controller(UserController::class)->group(function () {
@@ -408,6 +419,7 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
             ->name('cart.')->group(function () {
                 Route::get('/{user}', 'getCart')->name('getCart');
                 Route::post('/{user}', 'storeOrUpdateMany')->name('storeOrUpdateMany');
+                Route::delete('/item/{cartDetail}', 'destroy')->name('destroy');
             });
     });
 

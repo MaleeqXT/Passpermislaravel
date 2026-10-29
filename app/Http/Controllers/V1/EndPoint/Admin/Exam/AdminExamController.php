@@ -6,22 +6,37 @@ use App\Enums\V2\Admin\Popular\SituationStatusEnum;
 use App\Enums\V2\Student\Examen\ExamenResultPermisEnum;
 use App\Enums\V2\Student\Examen\ExamenStatusEnum;
 use App\Http\Controllers\Controller;
+use App\Models\Roles\Admin\Area\Lieu;
+use App\Models\Roles\Monitor\User\Monitor;
 use App\Models\Roles\Student\Exam\StudentExam;
 use App\Models\Roles\Student\User\Student;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\SatisfactionLifecycleService;
 
 class AdminExamController extends Controller
 {
     /** List active students together with the exam appointment managed by staff. */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $students = $this->studentsQuery()->get();
+        $zoneId = $this->effectiveZoneId($request);
+        $students = $this->studentsQuery($zoneId)->get();
 
         return response()->json([
             'data' => $students->map(fn (Student $student) => $this->serializeStudent($student))->values(),
+            'filters' => [
+                'monitors' => $this->monitorOptions($zoneId),
+                'locations' => $this->locationOptions($zoneId),
+                'students' => $students
+                    ->map(function (Student $student) {
+                        $exam = $this->serializeStudent($student);
+
+                        return ['value' => $exam['id'], 'label' => $exam['candidate']];
+                    })
+                    ->sortBy('label')
+                    ->values()
+                    ->all(),
+            ],
         ]);
     }
 
@@ -31,6 +46,11 @@ class AdminExamController extends Controller
      */
     public function update(Request $request, Student $student): JsonResponse
     {
+        $zoneId = $this->effectiveZoneId($request);
+        // An agency user may only modify candidates from their own agency. A
+        // Super Admin (who has no assigned zone) can explicitly select one.
+        $student = $this->studentsQuery($zoneId)->findOrFail($student->id);
+
         $validated = $request->validate([
             'date_examen' => ['sometimes', 'nullable', 'date'],
             'heure_passage' => ['sometimes', 'nullable', 'date_format:H:i'],
@@ -71,10 +91,10 @@ class AdminExamController extends Controller
 
         $exam->save();
 
-        // date_examen is the authoritative staff-confirmed exam assignment.
-        app(SatisfactionLifecycleService::class)->evaluateAll($student->fresh());
+        // StudentExam::saved centrally evaluates a confirmed official date,
+        // including this API and the legacy administration edit workflow.
 
-        $student = $this->studentsQuery()->findOrFail($student->id);
+        $student = $this->studentsQuery($zoneId)->findOrFail($student->id);
 
         return response()->json([
             'message' => 'Examen mis à jour avec succès.',
@@ -82,7 +102,7 @@ class AdminExamController extends Controller
         ]);
     }
 
-    private function studentsQuery()
+    private function studentsQuery(?string $zoneId = null)
     {
         return Student::query()
             ->with([
@@ -92,7 +112,48 @@ class AdminExamController extends Controller
                 'exams.lieu:id,name',
             ])
             ->whereHas('user', fn ($query) => $query->where('status', SituationStatusEnum::ACTIVE->value))
+            ->when($zoneId, fn ($query) => $query->whereHas('user', fn ($user) => $user->where('zone_id', $zoneId)))
             ->orderByDesc('created_at');
+    }
+
+    private function effectiveZoneId(Request $request): ?string
+    {
+        return $request->user()?->zone_id ?: $request->input('zone_id');
+    }
+
+    private function monitorOptions(?string $zoneId): array
+    {
+        return Monitor::query()
+            ->with('user:id,name,first_name,last_name')
+            ->whereIn('status', [1, '1', 'active'])
+            // Older monitor accounts have no zone yet. They must remain
+            // selectable until they are assigned, otherwise the agency list
+            // incorrectly appears to contain only newly-created monitors.
+            ->when($zoneId, fn ($query) => $query->whereHas('user', fn ($user) => $user
+                ->where('zone_id', $zoneId)
+                ->orWhereNull('zone_id')))
+            ->get()
+            ->map(fn (Monitor $monitor) => [
+                'value' => $monitor->id,
+                'label' => $this->personName($monitor->user),
+            ])
+            ->filter(fn (array $monitor) => filled($monitor['label']))
+            ->unique()
+            ->sortBy('label')
+            ->values()
+            ->all();
+    }
+
+    private function locationOptions(?string $zoneId): array
+    {
+        return Lieu::query()
+            ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
+            ->where('status', true)
+            ->orderBy('name')
+            ->pluck('name')
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function serializeStudent(Student $student): array
@@ -125,6 +186,7 @@ class AdminExamController extends Controller
             'resultPermis' => $this->frontendResult($exam?->result_permis),
             'comment' => $exam?->comment ?: '',
             'monitor' => $monitorName,
+            'monitorId' => $exam?->monitor?->id ?: $student->preferredMonitor?->id,
             'location' => $exam?->lieu?->name ?: '',
             'attemptCount' => $student->exams->filter(fn (StudentExam $item) =>
                 ! blank($item->result_permis)

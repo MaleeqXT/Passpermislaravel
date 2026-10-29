@@ -37,12 +37,16 @@ class CustomResetPasswordNotification extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $resetUrl = rtrim((string) config('app.frontend_url'), '/')
+            . '/reset-password/' . urlencode($this->token)
+            . '?email=' . urlencode($this->email);
+
         return (new MailMessage)
             ->subject('Demande de réinitialisation de mot de passe')
             ->greeting('Bonjour,')
             ->line("Nous avons reçu une demande pour réinitialiser le mot de passe de votre compte.")
             ->line("Si vous êtes à l'origine de cette demande, vous pouvez réinitialiser votre mot de passe en cliquant sur le lien ci-dessous.")
-            ->action('Réinitialiser mon mot de passe', url(route('password.reset', ['token' => $this->token, 'email' => $this->email])))
+            ->action('Réinitialiser mon mot de passe', $resetUrl)
             ->line("Attention, ce lien expirera dans 60 minutes.")
             ->line("Si vous n'avez pas demandé cette réinitialisation, ignorez simplement cet email. Votre mot de passe restera inchangé.")
             ->line("Si vous avez des questions ou avez besoin d'aide, contactez notre support.")

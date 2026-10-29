@@ -1,0 +1,1 @@
+import{P as t}from"./index-Cuz_F74D.js";import{A as o}from"./index-C3WuN1dQ.js";import{a as r,t as n,o as i,f as s,b as u,e}from"./useAlert-BpZAMlRJ.js";const _=r({__name:"AdminCreatePage",setup(d){const a=Math.random().toString(16).slice(2);return(m,c)=>(i(),n(e(t),{width:"full",padding:"none"},{default:s(()=>[u(e(o),{uuid:e(a)},null,8,["uuid"])]),_:1}))}});export{_ as default};

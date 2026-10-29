@@ -23,7 +23,7 @@ class FetchAllCarsRepo
 
         return Car::query()
             ->with('grayCarCart', 'assurance')
-            ->where('monitor_id', auth()->user()->monitor->id ?? $attributes['monitor_id'])
+            ->where('monitor_id', getMonitorId($attributes))
             ->when(request()->get('search'), fn($query) => self::applySearchFilter($query, $searchTerm))
             ->orderByDesc('created_at')
             ->get();

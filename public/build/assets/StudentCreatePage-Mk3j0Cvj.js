@@ -1,0 +1,1 @@
+import{S as t}from"./index-CiQ6UcVV.js";import{P as a}from"./index-Cuz_F74D.js";import{a as o,t as r,o as n,f as s,b as f,e}from"./useAlert-BpZAMlRJ.js";const i=o({__name:"StudentCreatePage",setup(m){return(p,c)=>(n(),r(e(a),{width:"full",padding:"none"},{default:s(()=>[f(e(t))]),_:1}))}});export{i as default};

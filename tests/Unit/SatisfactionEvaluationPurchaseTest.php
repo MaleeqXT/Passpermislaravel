@@ -10,6 +10,7 @@ use App\Enums\V2\Student\Examen\ExamenStatusEnum;
 use App\Http\Controllers\SatisfactionController;
 use App\Http\Requests\SatisfactionSubmitRequest;
 use App\Models\Roles\Student\User\Student;
+use App\Models\Roles\Student\Exam\StudentExam;
 use App\Models\Roles\Admin\Offer\Order\Sale;
 use App\Models\SatisfactionNotification;
 use App\Models\SatisfactionResponse;
@@ -46,16 +47,17 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
         config()->set('satisfaction.during_training_threshold_percent', 75);
 
         $schemas = [
-            'sales' => 'id TEXT PRIMARY KEY, student_id TEXT, cart_id TEXT, payment_status INTEGER, payment_method INTEGER, payment_id TEXT, amount REAL, deleted_at TEXT, created_at TEXT, updated_at TEXT',
+            'sales' => 'id TEXT PRIMARY KEY, student_id TEXT, cart_id TEXT, payment_status INTEGER, payment_method INTEGER, payment_id TEXT, amount REAL, balance INTEGER, deleted_at TEXT, created_at TEXT, updated_at TEXT',
             'students' => 'id TEXT PRIMARY KEY, user_id TEXT, deleted_at TEXT',
             'carts' => 'id TEXT PRIMARY KEY, student_id TEXT, status INTEGER, deleted_at TEXT',
-            'cart_details' => 'id TEXT PRIMARY KEY, cart_id TEXT, offer_id TEXT, deleted_at TEXT',
+            'cart_details' => 'id TEXT PRIMARY KEY, cart_id TEXT, offer_id TEXT, balance REAL, quantity INTEGER, deleted_at TEXT',
+            'satisfaction_enrollments' => 'id TEXT PRIMARY KEY, student_id TEXT, sale_id TEXT, offer_id TEXT, purchased_minutes INTEGER, is_first_hour INTEGER, is_driving_package INTEGER, created_at TEXT, updated_at TEXT, UNIQUE(sale_id, offer_id)',
             'satisfaction_surveys' => 'id TEXT PRIMARY KEY, stage TEXT, is_active INTEGER, created_at TEXT, updated_at TEXT',
-            'satisfaction_responses' => 'id TEXT PRIMARY KEY, survey_id TEXT, candidate_id TEXT, offer_id TEXT, status TEXT, google_choice TEXT, google_clicked INTEGER DEFAULT 0, google_clicked_at TEXT, submitted_at TEXT, created_at TEXT, updated_at TEXT, UNIQUE(survey_id, candidate_id)',
-            'satisfaction_notifications' => 'id TEXT PRIMARY KEY, candidate_id TEXT, survey_id TEXT, response_id TEXT, type TEXT, title TEXT, message TEXT, read_at TEXT, email_attempts INTEGER DEFAULT 0, last_email_attempt_at TEXT, email_sent_at TEXT, created_at TEXT, updated_at TEXT, UNIQUE(candidate_id, survey_id)',
+            'satisfaction_responses' => 'id TEXT PRIMARY KEY, survey_id TEXT, candidate_id TEXT, offer_id TEXT, satisfaction_enrollment_id TEXT, status TEXT, google_choice TEXT, google_clicked INTEGER DEFAULT 0, google_clicked_at TEXT, submitted_at TEXT, created_at TEXT, updated_at TEXT, UNIQUE(survey_id, candidate_id, satisfaction_enrollment_id)',
+            'satisfaction_notifications' => 'id TEXT PRIMARY KEY, candidate_id TEXT, survey_id TEXT, offer_id TEXT, satisfaction_enrollment_id TEXT, response_id TEXT, type TEXT, title TEXT, message TEXT, read_at TEXT, email_attempts INTEGER DEFAULT 0, last_email_attempt_at TEXT, email_sent_at TEXT, created_at TEXT, updated_at TEXT, UNIQUE(candidate_id, survey_id, satisfaction_enrollment_id)',
             'review_monitors' => 'id TEXT PRIMARY KEY, reservation_id TEXT, monitor_id TEXT, is_absent INTEGER, comment TEXT',
             'reservations' => 'id TEXT PRIMARY KEY, date TEXT, end_at TEXT, hour REAL, duration_minutes INTEGER, is_active INTEGER, deleted_at TEXT',
-            'trainings' => 'id TEXT PRIMARY KEY, reservation_id TEXT, student_id TEXT, offer_id TEXT, deleted_at TEXT',
+            'trainings' => 'id TEXT PRIMARY KEY, reservation_id TEXT, student_id TEXT, offer_id TEXT, satisfaction_enrollment_id TEXT, deleted_at TEXT, created_at TEXT, updated_at TEXT',
             'offers' => 'id TEXT PRIMARY KEY, balance REAL, type INTEGER, type_offre INTEGER, is_evaluation INTEGER DEFAULT 0, deleted_at TEXT',
             'cancellations' => 'id TEXT PRIMARY KEY, training_id TEXT, status INTEGER',
             'student_exams' => 'id TEXT PRIMARY KEY, student_id TEXT, date_examen TEXT, status INTEGER, result_permis INTEGER',
@@ -112,12 +114,12 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
 
         $response->update(['status' => 'completed']);
         $this->purchase($offerId, amount: $amount);
-        $this->assertNull($service->evaluate($this->student));
-        $this->assertSame(1, SatisfactionResponse::count());
-        Notification::assertSentOnDemandTimes(FirstHourSatisfactionNotification::class, 1);
+        $this->assertSame('before_training', $service->evaluate($this->student)?->survey->stage);
+        $this->assertSame(2, SatisfactionResponse::count());
+        Notification::assertSentOnDemandTimes(FirstHourSatisfactionNotification::class, 2);
     }
 
-    public function test_confirmed_driving_package_purchase_triggers_before_for_every_confirmed_payment_method(): void
+    public function test_confirmed_unrelated_driving_package_does_not_trigger_before(): void
     {
         $offerId = (string) Str::uuid();
         $this->createOffer($offerId, 20);
@@ -125,9 +127,19 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
 
         $response = app(SatisfactionLifecycleService::class)->evaluate($this->student);
 
-        $this->assertSame('before_training', $response?->survey->stage);
-        $this->assertSame(1, SatisfactionNotification::count());
-        Notification::assertSentOnDemandTimes(FirstHourSatisfactionNotification::class, 1);
+        $this->assertNull($response);
+        $this->assertSame(0, SatisfactionNotification::count());
+        Notification::assertNothingSent();
+    }
+
+    public function test_a_price_of_38_without_an_eligible_offer_id_does_not_trigger_before(): void
+    {
+        $offerId = (string) Str::uuid();
+        $this->createOffer($offerId, 1, type: OffreTypeStatusEnum::CODE->value);
+        $this->purchase($offerId, SaleStatusEnum::PAID->value, 'pi_unrelated_38', 38);
+
+        $this->assertNull(app(SatisfactionLifecycleService::class)->evaluate($this->student));
+        $this->assertSame(0, SatisfactionResponse::whereHas('survey', fn ($query) => $query->where('stage', 'before_training'))->count());
     }
 
     public function test_paid_status_transition_reconciles_the_student_after_commit(): void
@@ -232,6 +244,27 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
         $this->assertSame(1, SatisfactionResponse::where('survey_id', $response->survey_id)->count());
     }
 
+    public function test_twenty_hour_package_activates_during_at_fifteen_hours_once(): void
+    {
+        $offerId = (string) Str::uuid();
+        $this->createOffer($offerId, 20);
+        $lifecycle = app(SatisfactionLifecycleService::class);
+
+        $this->assertNull($lifecycle->evaluate($this->student));
+        $this->completedLesson($offerId, 600); // 10 hours
+        $this->assertNull($lifecycle->evaluate($this->student));
+        $this->completedLesson($offerId, 240); // 14 hours
+        $this->assertNull($lifecycle->evaluate($this->student));
+        $this->completedLesson($offerId, 60); // 15 hours exactly
+        $this->assertSame('during_training', $lifecycle->evaluate($this->student)?->survey->stage);
+        $this->completedLesson($offerId, 60); // 16+ hours
+        $lifecycle->evaluateAll($this->student);
+
+        $duringSurveyId = SatisfactionSurvey::where('stage', 'during_training')->value('id');
+        $this->assertSame(1, SatisfactionResponse::where('survey_id', $duringSurveyId)->where('candidate_id', $this->student->id)->count());
+        $this->assertSame(1, SatisfactionNotification::where('survey_id', $duringSurveyId)->where('candidate_id', $this->student->id)->count());
+    }
+
     public function test_during_threshold_is_configurable_without_losing_exact_minute_calculation(): void
     {
         $offerId = (string) Str::uuid();
@@ -292,6 +325,7 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
 
     public function test_confirmed_exam_date_activates_after_training_once(): void
     {
+        $this->createOffer((string) Str::uuid(), 20);
         DB::table('student_exams')->insert([
             'id' => (string) Str::uuid(),
             'student_id' => $this->student->id,
@@ -308,6 +342,7 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
 
     public function test_exam_rescheduling_never_creates_a_second_after_survey_or_notification(): void
     {
+        $this->createOffer((string) Str::uuid(), 20);
         $examId = (string) Str::uuid();
         DB::table('student_exams')->insert([
             'id' => $examId,
@@ -332,8 +367,33 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
         Notification::assertSentOnDemandTimes(FirstHourSatisfactionNotification::class, 1);
     }
 
+    public function test_saving_a_confirmed_official_exam_date_triggers_after_for_every_admin_workflow(): void
+    {
+        $this->createOffer((string) Str::uuid(), 20);
+
+        StudentExam::withoutTimestamps(function (): void {
+            StudentExam::query()->create([
+                'student_id' => $this->student->id,
+                'date_examen' => '2030-01-01',
+                'status' => ExamenStatusEnum::PENDING->value,
+                'result_permis' => null,
+            ]);
+        });
+
+        $afterSurveyId = SatisfactionSurvey::where('stage', 'after_training')->value('id');
+        $this->assertSame(1, SatisfactionResponse::where('survey_id', $afterSurveyId)->where('candidate_id', $this->student->id)->count());
+
+        StudentExam::withoutTimestamps(function () use ($afterSurveyId): void {
+            $exam = StudentExam::query()->firstOrFail();
+            $exam->date_examen = '2030-02-15';
+            $exam->save();
+            $this->assertSame(1, SatisfactionResponse::where('survey_id', $afterSurveyId)->where('candidate_id', $this->student->id)->count());
+        });
+    }
+
     public function test_unconfirmed_cancelled_or_finalized_exam_records_do_not_activate_after_training(): void
     {
+        $this->createOffer((string) Str::uuid(), 20);
         foreach ([
             ['date_examen' => null, 'status' => ExamenStatusEnum::PENDING->value, 'result_permis' => null],
             ['date_examen' => '2030-01-01', 'status' => ExamenStatusEnum::SUCCESS->value, 'result_permis' => 1],
@@ -462,9 +522,15 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
     public function test_database_unique_constraint_prevents_duplicate_stage_responses(): void
     {
         $survey = SatisfactionSurvey::where('stage', 'before_training')->firstOrFail();
+        $enrollmentId = (string) Str::uuid();
+        DB::table('satisfaction_enrollments')->insert([
+            'id' => $enrollmentId, 'student_id' => $this->student->id, 'sale_id' => (string) Str::uuid(),
+            'offer_id' => (string) Str::uuid(), 'purchased_minutes' => 60, 'is_first_hour' => 1, 'is_driving_package' => 0,
+        ]);
         SatisfactionResponse::create([
             'survey_id' => $survey->id,
             'candidate_id' => $this->student->id,
+            'satisfaction_enrollment_id' => $enrollmentId,
             'status' => 'started',
         ]);
 
@@ -472,9 +538,10 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
             SatisfactionResponse::create([
                 'survey_id' => $survey->id,
                 'candidate_id' => $this->student->id,
+                'satisfaction_enrollment_id' => $enrollmentId,
                 'status' => 'started',
             ]);
-            $this->fail('The database must reject a duplicate student/stage response.');
+            $this->fail('The database must reject a duplicate enrolment/stage response.');
         } catch (QueryException) {
             $this->assertSame(1, SatisfactionResponse::where('survey_id', $survey->id)->where('candidate_id', $this->student->id)->count());
         }
@@ -482,8 +549,8 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
 
     public function test_all_completed_stages_leave_no_pending_survey_and_never_reactivate(): void
     {
-        $evaluationOfferId = (string) Str::uuid();
-        $this->createOffer($evaluationOfferId, 1, isEvaluation: true);
+        $evaluationOfferId = '84aeacd3-a396-11f1-a172-9840bb4923f7';
+        $this->createOffer($evaluationOfferId, 1, type: OffreTypeStatusEnum::CODE->value, isEvaluation: true);
         $this->purchase($evaluationOfferId);
 
         $trainingOfferId = (string) Str::uuid();
@@ -585,10 +652,13 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
         $cartId = (string) Str::uuid();
         $saleId = (string) Str::uuid();
         DB::table('carts')->insert(['id' => $cartId, 'student_id' => $this->student->id, 'status' => 2]);
-        DB::table('cart_details')->insert(['id' => (string) Str::uuid(), 'cart_id' => $cartId, 'offer_id' => $offerId]);
+        DB::table('cart_details')->insert(['id' => (string) Str::uuid(), 'cart_id' => $cartId, 'offer_id' => $offerId, 'balance' => null, 'quantity' => 1]);
         DB::table('sales')->insert([
             'id' => $saleId, 'student_id' => $this->student->id, 'cart_id' => $cartId,
             'payment_status' => $status, 'payment_method' => $method, 'payment_id' => $paymentId, 'amount' => $amount,
+            // This is the immutable purchased package quantity, deliberately
+            // separate from the student's mutable wallet balance.
+            'balance' => DB::table('offers')->where('id', $offerId)->value('balance') ?? 0,
         ]);
         return $saleId;
     }
@@ -607,6 +677,11 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
             'type_offre' => $typeOffre,
             'is_evaluation' => $isEvaluation ? 1 : 0,
         ]);
+        if ($type === OffreTypeStatusEnum::CONDUITE->value
+            && $typeOffre === OffreTypeEnum::FORFAIT->value
+            && !in_array($offerId, ['84aeacd3-a396-11f1-a172-9840bb4923f7', '9eec8bb6-af81-4846-b729-5c646ead54f4'], true)) {
+            $this->purchase($offerId, SaleStatusEnum::PAID->value, 'pi_package_' . Str::uuid(), 0);
+        }
     }
 }
 
@@ -614,7 +689,7 @@ class RetryableSatisfactionLifecycleService extends SatisfactionLifecycleService
 {
     public bool $shouldFail = false;
 
-    protected function sendSurveyEmail(Student $student, string $stage): void
+    protected function sendSurveyEmail(Student $student, string $stage, string $responseId): void
     {
         if ($this->shouldFail) {
             throw new \RuntimeException('Simulated transport failure');

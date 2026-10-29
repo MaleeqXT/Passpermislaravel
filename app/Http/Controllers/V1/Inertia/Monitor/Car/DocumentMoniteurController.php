@@ -11,6 +11,7 @@ use App\Repository\V2\Monitor\Instructor\IdentityRecord\StoreOrEditIdentityRecor
 use App\Repository\V2\Monitor\Instructor\License\FetchAllLicenseRepo;
 use App\Repository\V2\Monitor\Instructor\License\StoreOrEditLicenseRepo;
 use Exception;
+use App\Models\Roles\Monitor\User\Monitor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -88,11 +89,18 @@ class DocumentMoniteurController extends Controller
      */
     public function storeOrUpdate(StoreOrUpdateDocumentRequest $request)
 {
+    $monitor = $this->resolveMonitor($request);
+
+    if (! $monitor) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Profil moniteur introuvable.',
+        ], 422);
+    }
+
     DB::beginTransaction();
 
     try {
-        $monitor = auth()->user()->monitor;
-
         StoreOrEditCertificationRepo::run(
             $monitor,
             $request->only('media_diplom')
@@ -125,6 +133,20 @@ class DocumentMoniteurController extends Controller
         ], 500);
     }
 }
+
+    /**
+     * The React monitor dashboard can be opened by an authorised dashboard
+     * preview. In that case the authenticated user is not itself a monitor,
+     * but the selected monitor id is already supplied by the dashboard.
+     */
+    private function resolveMonitor(StoreOrUpdateDocumentRequest $request): ?Monitor
+    {
+        if ($request->filled('monitor_id')) {
+            return Monitor::query()->find($request->input('monitor_id'));
+        }
+
+        return $request->user()?->monitor;
+    }
     // public function storeOrUpdate(StoreOrUpdateDocumentRequest $request)
     // {
     //     DB::beginTransaction();

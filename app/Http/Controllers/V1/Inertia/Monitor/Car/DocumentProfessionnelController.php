@@ -8,6 +8,7 @@ use App\Repository\V2\Monitor\Instructor\Document\FetchInstructorDocumentRepo;
 use App\Repository\V2\Monitor\Instructor\Document\StoreOrEditInstructorDocumentRepo;
 use App\Repository\V2\Monitor\Instructor\Permission\StoreOrEditPermissionInstructorRepo;
 use Exception;
+use App\Models\Roles\Monitor\User\Monitor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -63,12 +64,18 @@ public function index()
     // }
     public function storeOrUpdate(StoreOrUpdateDocumentProRequest $request)
 {
+    $monitor = $this->resolveMonitor($request);
+
+    if (! $monitor) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Profil moniteur introuvable.',
+        ], 422);
+    }
 
     DB::beginTransaction();
 
     try {
-        $monitor = auth()->user()->monitor;
-
         $documentPro = StoreOrEditInstructorDocumentRepo::run(
             $monitor,
             $request->except('autorisations')
@@ -99,4 +106,17 @@ public function index()
         ], 500);
     }
 }
+
+    /**
+     * Supports the existing monitor-dashboard preview context without ever
+     * passing a null monitor into the repository layer.
+     */
+    private function resolveMonitor(StoreOrUpdateDocumentProRequest $request): ?Monitor
+    {
+        if ($request->filled('monitor_id')) {
+            return Monitor::query()->find($request->input('monitor_id'));
+        }
+
+        return $request->user()?->monitor;
+    }
 }

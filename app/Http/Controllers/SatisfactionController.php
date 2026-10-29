@@ -57,6 +57,8 @@ class SatisfactionController extends Controller
             ->with(['survey.questions' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])
             ->where('candidate_id', $student->id)
             ->whereHas('survey', fn ($query) => $query->where('stage', $stage))
+            ->when($request->filled('response'), fn ($query) => $query->whereKey($request->input('response')))
+            ->orderBy('created_at')
             ->first();
         abort_unless($response, 404);
 
@@ -111,6 +113,8 @@ class SatisfactionController extends Controller
             $r = SatisfactionResponse::query()
                 ->where('survey_id', $survey->id)
                 ->where('candidate_id', $student->id)
+                ->when($request->filled('response_id'), fn ($query) => $query->whereKey($request->input('response_id')))
+                ->orderBy('created_at')
                 ->lockForUpdate()
                 ->first();
             if (! $r || $r->status !== 'started') {
@@ -171,7 +175,7 @@ class SatisfactionController extends Controller
     public function adminList(Request $request)
     {
         $request->validate(['date_from'=>'nullable|date','date_to'=>'nullable|date','rating'=>'nullable|integer|min:1|max:5']);
-        $q=SatisfactionResponse::with(['survey','candidate.user'])->latest('submitted_at');
+        $q=SatisfactionResponse::with(['survey','candidate.user','answers.question','enrollment.trainings.reservation.monitor.user'])->latest('submitted_at');
         if($request->filled('survey_id'))$q->where('survey_id',$request->survey_id); if($request->filled('status'))$q->where('status',$request->status); if($request->filled('date_from'))$q->whereDate('submitted_at','>=',$request->date_from); if($request->filled('date_to'))$q->whereDate('submitted_at','<=',$request->date_to); if($request->filled('search'))$q->whereHas('candidate.user',fn($u)=>$u->where('name','like','%'.$request->search.'%')->orWhere('email','like','%'.$request->search.'%')); if($request->filled('rating'))$q->whereHas('answers',fn($a)=>$a->where('rating',(int)$request->rating));
         return response()->json($q->paginate(min((int)$request->input('per_page',20),100)));
     }
@@ -198,6 +202,7 @@ class SatisfactionController extends Controller
                 $survey->setAttribute('completed', false);
                 $survey->setAttribute('response_id', $response->id);
                 $survey->setAttribute('offer_id', $response->offer_id);
+                $survey->setAttribute('satisfaction_enrollment_id', $response->satisfaction_enrollment_id);
                 return $survey;
             });
     }

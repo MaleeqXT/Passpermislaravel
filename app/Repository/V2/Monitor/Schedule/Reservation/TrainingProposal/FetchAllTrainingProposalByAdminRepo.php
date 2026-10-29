@@ -31,6 +31,10 @@ class FetchAllTrainingProposalByAdminRepo
                 fn(Builder $query) => $query->whereRelation('reservation', 'monitor_id', $monitor_id)
             )
             ->when(
+                isset($attributes['zone_id']),
+                fn(Builder $query) => $query->whereRelation('reservation.lieu', 'zone_id', $attributes['zone_id'])
+            )
+            ->when(
                 $student_id = getStudentId($attributes),
                 fn(Builder $query) => $query->where('student_id', $student_id)
             )

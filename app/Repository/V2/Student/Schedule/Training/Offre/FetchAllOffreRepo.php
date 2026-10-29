@@ -20,7 +20,12 @@ class FetchAllOffreRepo
         $attributes ??= [];
         $searchTerm = '%' . request()->get('search') . '%';
         $student = auth()->user()?->student;
-        $boiteType = $student?->boite_type ?? ($attributes['boite_type'] ?? null);
+        // Public CPF catalogue needs to display both licence types even when a
+        // visitor is already logged in as a student. All protected student
+        // catalogue callers keep their profile gearbox restriction.
+        $boiteType = !empty($attributes['ignore_student_boite_type'])
+            ? ($attributes['boite_type'] ?? null)
+            : ($student?->boite_type ?? ($attributes['boite_type'] ?? null));
         $zoneIds = self::normaliseZoneIds($attributes['zone_id'] ?? null);
 
         $paginator = Offer::query()

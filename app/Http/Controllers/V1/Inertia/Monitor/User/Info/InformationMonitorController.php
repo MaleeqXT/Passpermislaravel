@@ -28,16 +28,24 @@ class InformationMonitorController extends Controller
      * @param Monitor $monitor
      * @return Response
      */
-    public function documents(Monitor $monitor): Response
+    public function documents(Monitor $monitor)
     {
-
-        return Inertia::render('features/roles/monitors/view/MonitorDocumentsPage', [
+        $documents = [
             'pieceIdentite' => FetchIdentityRecordRepo::run(array_merge(request()->all(), ['monitor_id' => $monitor->id])),
             'permis' => FetchAllLicenseRepo::run(array_merge(request()->all(), ['monitor_id' => $monitor->id])),
             'diplom' => FetchAllCertificationRepo::run(array_merge(request()->all(), ['monitor_id' => $monitor->id])),
             'professionel' => FetchInstructorDocumentRepo::run(array_merge(request()->all(), ['monitor_id' => $monitor->id])),
-            'monitor' => $monitor->load('user')
-        ]);
+            'monitor' => $monitor->load('user'),
+        ];
+
+        // The React administration uses the same route with an API Accept
+        // header. Return the exact existing document payload instead of an
+        // Inertia HTML response in that case.
+        if (request()->expectsJson()) {
+            return response()->json($documents);
+        }
+
+        return Inertia::render('features/roles/monitors/view/MonitorDocumentsPage', $documents);
     }
 
     /**
@@ -51,7 +59,7 @@ class InformationMonitorController extends Controller
         Monitor                         $monitor,
         StoreOrUpdateDocumentRequest    $request,
         StoreOrUpdateDocumentProRequest $requestPro,
-    ): RedirectResponse {
+    ) {
         DB::beginTransaction();
         try {
             // @todo reda refactor this code
@@ -62,6 +70,13 @@ class InformationMonitorController extends Controller
             if ($request->get('autorisations'))
                 StoreOrEditPermissionInstructorRepo::run($documentPro, $requestPro->get('autorisations'));
             DB::commit();
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => flashMessage(),
+                ]);
+            }
+
             return redirect()->back()->with('success', flashMessage());
         } catch (Exception $e) {
             DB::rollBack();

@@ -56,6 +56,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('/lessons/{reservation}/schema', 'schema')->name('student.formation.schema');
         Route::put('/lessons/{reservation}/schema', 'updateSchema')->name('student.formation.schema.update');
         Route::post('/booklet', 'sendBooklet')->middleware('throttle:3,1')->name('student.formation.booklet.send');
+        Route::get('/booklet/download', 'downloadBooklet')->name('student.formation.booklet.download');
     });
     Route::put('/progress/competencies/{competency}/comment', [StudentProgressController::class, 'updateStudentComment'])
         ->name('student.progress.competencies.comment.update');

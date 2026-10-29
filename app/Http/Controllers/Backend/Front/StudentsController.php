@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\Student\User\Info\RegisterStudentRequest;
 use App\Models\User;
 use App\Repository\User\StoreUser;
+use App\Support\CandidateZoneResolver;
 use App\Repository\V2\Student\User\StoreStudentRepo;
 use Exception;
 use Illuminate\Http\RedirectResponse;
@@ -37,8 +38,16 @@ class StudentsController extends Controller
 {
     DB::beginTransaction();
     try {
+        $userAttributes = $request->validated();
+
+        // The public form submits the selected zone for immediate UI state,
+        // but the server derives it from the selected city before persisting.
+        // This keeps Creil and Toulouse registrations in their correct zone
+        // even if a request is altered outside the form.
+        $userAttributes['zone_id'] = CandidateZoneResolver::forVille($userAttributes['ville'] ?? null);
+
         // create User
-        $user = $createUser::run($request->validated() + ['role' => UserRolesEnum::STUDENT->value]);
+        $user = $createUser::run($userAttributes + ['role' => UserRolesEnum::STUDENT->value]);
 
         // create Student
         $dataFromRequest = $request->only(['neph', 'neph_status', 'date_code', 'how_know', 'boite_type']);

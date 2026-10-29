@@ -1,0 +1,1 @@
+import{P as o}from"./index-Cuz_F74D.js";import{M as a}from"./index-C6kviC67.js";import{a as t,t as r,o as n,f as s,b as f,e}from"./useAlert-BpZAMlRJ.js";const u=t({__name:"MonitorCreatePage",setup(i){return(m,p)=>(n(),r(e(o),{width:"full",padding:"none"},{default:s(()=>[f(e(a))]),_:1}))}});export{u as default};

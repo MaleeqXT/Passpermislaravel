@@ -52,6 +52,11 @@ class Training extends Model
         return $this->belongsTo(Offer::class);
     }
 
+    public function satisfactionEnrollment(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\SatisfactionEnrollment::class, 'satisfaction_enrollment_id');
+    }
+
     /**
      * @return BelongsTo
      */

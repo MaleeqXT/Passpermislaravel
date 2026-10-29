@@ -19,6 +19,7 @@ class FetchAllCancellationRepo
             ->with([
                 'training' => fn($query) => $query->withoutGlobalScope(SoftDeletingScope::class),
                 'training.student.user:id,name,media,phone,email',
+                'training.offer:id,name,color',
                 'training.reservation.monitor.user:id,name,media,phone,email',
                 'training.reservation.lieu.zone',
             ])
@@ -31,7 +32,7 @@ class FetchAllCancellationRepo
             ->when(isset($attributes['is_justified']), fn($query) => self::applyJustifiedFilter($query, $attributes))
             ->whereHas('training', fn($query) => $query->withoutGlobalScope(SoftDeletingScope::class))
             ->orderByDesc('created_at')
-            ->paginate();
+            ->paginate((int) ($attributes['per_page'] ?? 15));
     }
 
     /**

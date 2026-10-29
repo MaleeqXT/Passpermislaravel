@@ -10,6 +10,7 @@ use App\Repository\V2\Student\Schedule\Training\Cancellation\FetchAllCancellatio
 use App\Services\Student\Training\Cancellation\CancellationInterface;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -25,15 +26,18 @@ class AdminCancellationController extends Controller
     /**
      * 
      */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        $zoneId = auth()->user()->zone_id;
+        // Agency staff are always restricted to their own zone. Super Admins
+        // have no assigned zone and therefore use the agency selected in the
+        // React administration shell.
+        $zoneId = $request->user()?->zone_id ?: $request->input('zone_id');
         $filters = array_merge(request()->all(), [
             'zone_id' => $zoneId,
         ]);
 
         $baseQuery = Cancellation::query()
-            ->whereHas('training.student.user', fn($query) => $query->where('zone_id', $zoneId));
+            ->when($zoneId, fn($query) => $query->whereHas('training.student.user', fn($user) => $user->where('zone_id', $zoneId)));
 
         return response()->json([
             'cancellations' => FetchAllCancellationRepo::run($filters),
@@ -62,8 +66,16 @@ class AdminCancellationController extends Controller
      * @throws NotFoundExceptionInterface
      * @throws Exception
      */
-    public function update(Cancellation $cancellation, CancellationInterface $service): RedirectResponse|JsonResponse
+    public function update(Request $request, Cancellation $cancellation, CancellationInterface $service): RedirectResponse|JsonResponse
     {
+        $zoneId = $request->user()?->zone_id ?: $request->input('zone_id');
+        if ($zoneId && ! Cancellation::query()
+            ->whereKey($cancellation->id)
+            ->whereHas('training.student.user', fn ($user) => $user->where('zone_id', $zoneId))
+            ->exists()) {
+            abort(404);
+        }
+
         DB::beginTransaction();
         try {
             $data = [

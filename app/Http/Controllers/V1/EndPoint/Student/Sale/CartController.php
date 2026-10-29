@@ -28,6 +28,12 @@ class CartController extends Controller
         return response()->json($getCart::run($user));
     }
 
+    /** Backwards-compatible cart reader used by the admin API route. */
+    public function getCart(FetchCartRepo $getCart, User $user): JsonResponse
+    {
+        return response()->json($getCart::run($user));
+    }
+
 
     /**
      * @param CartRequest $request

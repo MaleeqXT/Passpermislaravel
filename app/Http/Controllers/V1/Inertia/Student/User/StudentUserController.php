@@ -436,19 +436,32 @@ public function update(
      */
 public function destroy(Student $student):ResponseJson
 {
-    $user = $student->user;
-    if ($user) {
-        $user->tokens()->delete();
-        $user->deleteProfilePhoto();
-        $user->forceDelete();
-    }
-    $student->forceDelete();
+    DB::transaction(function () use ($student) {
+        $user = $student->user;
+
+        if ($user) {
+            $user->tokens()->delete();
+            $user->deleteProfilePhoto();
+        }
+
+        // forceDelete bypasses Laravel soft-deletes: the confirmed record is
+        // removed permanently from the students and users tables.
+        $student->forceDelete();
+        $user?->forceDelete();
+    });
 
     return response()->json(['success' => true]);
 }
 
     public function getBalanceAndZones(Student $student, FetchAllStudentWalletRepo $walletsByEleveAction, FetchStudentRepo $getStudent)
     {
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'balances' => $walletsByEleveAction::run($student, request()->all()),
+                'user' => $getStudent::run(request()->all(), $student->user_id),
+            ]);
+        }
 
         return Inertia::render('features/roles/students/views/StudentBalanceView', [
             'balances' => $walletsByEleveAction::run($student, request()->all()),

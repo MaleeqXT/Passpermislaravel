@@ -7,6 +7,7 @@ use App\Models\DocumentEvaluation;
 use App\Models\Roles\Monitor\Schedule\Reservation;
 use App\Models\Roles\Student\Schedule\Rating;
 use App\Notifications\V1\Monitor\Training\StudentTrainingBookletNotification;
+use App\Services\Monitor\Training\StudentTrainingBookletPdfService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -89,6 +90,25 @@ class StudentFormationController extends Controller
         Notification::route('mail', $student->user->email)->notify(new StudentTrainingBookletNotification($sender, $student, $lessons));
 
         return response()->json(['data' => ['message' => 'Votre livret de formation a été envoyé à votre adresse e-mail.', 'lesson_count' => $lessons->count()]]);
+    }
+
+    /**
+     * Download the same booklet PDF sent by email, scoped to the authenticated
+     * student (including a staff-issued student dashboard preview token).
+     */
+    public function downloadBooklet(Request $request, StudentTrainingBookletPdfService $booklet)
+    {
+        $student = $request->user()?->student;
+        if (!$student) return response()->json(['message' => 'Élève introuvable.'], 404);
+
+        $student->loadMissing('user');
+        $lessons = $this->lessons($student->id);
+        abort_if($lessons->isEmpty(), 422, 'Aucune leçon n’est disponible pour générer votre livret.');
+
+        return response($booklet->output($student, $lessons), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$booklet->filename($student).'"',
+        ]);
     }
 
     private function validatedSchema(Request $request): array

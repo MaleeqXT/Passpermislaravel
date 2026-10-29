@@ -13,6 +13,7 @@ use App\Http\Controllers\V1\EndPoint\Student\Info\ListStudentByMonitorController
 use App\Http\Controllers\V1\EndPoint\Student\Proposition\ProposalTrainingController;
 use App\Http\Controllers\V1\Inertia\Monitor\Car\DocumentMoniteurController;
 use App\Http\Controllers\V1\Inertia\Monitor\Car\DocumentProfessionnelController;
+use App\Http\Controllers\V1\Inertia\Monitor\Car\CarMoniteurController;
 use App\Http\Controllers\V1\Inertia\Monitor\User\UsersController;
 use App\Http\Controllers\V1\Inertia\Student\Infrastructure\Training\MonitorProposalTrainingController;
 use App\Http\Controllers\V1\Inertia\Student\Infrastructure\Training\StudentCancellationController as EleveAnnulationTardiveController;
@@ -167,11 +168,21 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
                 });
         });
 
+    Route::prefix('vehicles')->name('vehicles.')
+        ->controller(CarMoniteurController::class)
+        ->group(function () {
+            Route::get('/', 'apiIndex')->name('index');
+            Route::post('/', 'apiStore')->name('store');
+            Route::put('/{car}', 'apiUpdate')->name('update');
+            Route::delete('/{car}', 'apiDestroy')->name('destroy');
+        });
+
     Route::prefix('invoices')
         ->name('invoices.')
         ->controller(InvoiceController::class)
         ->group(function () {
-            // Route::get('/invoice/rapport', 'rapport')->name('rapport');
+            Route::get('/', 'index')->name('index');
+            Route::get('/rapport', 'rapport')->name('rapport');
             Route::get('{billing}', 'hourRapport2')->name('rapport.hours');
         });
 

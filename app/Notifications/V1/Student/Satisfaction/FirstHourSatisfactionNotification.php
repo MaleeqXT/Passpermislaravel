@@ -11,7 +11,7 @@ class FirstHourSatisfactionNotification extends Notification implements ShouldQu
 {
     use Queueable;
 
-    public function __construct(private readonly string $stage = 'during_training') {}
+    public function __construct(private readonly string $stage = 'during_training', private readonly ?string $responseId = null) {}
 
     public function via($notifiable): array
     {
@@ -30,7 +30,7 @@ class FirstHourSatisfactionNotification extends Notification implements ShouldQu
             ->subject('Votre avis sur votre formation PassPermisFacile')
             ->greeting('Bonjour,')
             ->line($message)
-            ->action('Donner mon avis', rtrim(config('satisfaction.frontend_url'), '/') . '/satisfaction?stage=' . urlencode($this->stage))
+            ->action('Donner mon avis', rtrim(config('satisfaction.frontend_url'), '/') . '/satisfaction?stage=' . urlencode($this->stage) . ($this->responseId ? '&response=' . urlencode($this->responseId) : ''))
             ->line('Merci de prendre quelques minutes pour répondre à notre enquête de satisfaction.')
             ->salutation('L’équipe PassPermisFacile');
     }
