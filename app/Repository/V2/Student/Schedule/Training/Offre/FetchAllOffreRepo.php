@@ -115,7 +115,12 @@ class FetchAllOffreRepo
         return array_values(array_unique(array_filter((array) $zoneIds, fn ($zoneId) => filled($zoneId))));
     }
 
-    private static function applyAgencyPricing(Offer $offer, array $zoneIds): Offer
+    /**
+     * Apply the existing zone-specific price fields to an offer that was
+     * fetched outside the paginated catalogue (for example, a guest cart
+     * restored immediately after login).
+     */
+    public static function applyAgencyPricing(Offer $offer, array $zoneIds): Offer
     {
         $pricing = self::normalisePricing($offer->agency_pricing);
         $pricingByAgency = collect($pricing)

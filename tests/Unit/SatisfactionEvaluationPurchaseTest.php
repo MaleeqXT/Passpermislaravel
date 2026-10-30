@@ -11,6 +11,7 @@ use App\Http\Controllers\SatisfactionController;
 use App\Http\Requests\SatisfactionSubmitRequest;
 use App\Models\Roles\Student\User\Student;
 use App\Models\Roles\Student\Exam\StudentExam;
+use App\Models\Roles\Monitor\Schedule\ReviewMonitor;
 use App\Models\Roles\Admin\Offer\Order\Sale;
 use App\Models\SatisfactionNotification;
 use App\Models\SatisfactionResponse;
@@ -18,6 +19,7 @@ use App\Models\SatisfactionSurvey;
 use App\Models\User;
 use App\Notifications\V1\Student\Satisfaction\FirstHourSatisfactionNotification;
 use App\Services\SatisfactionLifecycleService;
+use App\Services\SatisfactionOfferTriggerService;
 use App\Repository\V2\Shared\Schedule\Sale\EditSaleRepo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -58,7 +60,7 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
             'review_monitors' => 'id TEXT PRIMARY KEY, reservation_id TEXT, monitor_id TEXT, is_absent INTEGER, comment TEXT',
             'reservations' => 'id TEXT PRIMARY KEY, date TEXT, end_at TEXT, hour REAL, duration_minutes INTEGER, is_active INTEGER, deleted_at TEXT',
             'trainings' => 'id TEXT PRIMARY KEY, reservation_id TEXT, student_id TEXT, offer_id TEXT, satisfaction_enrollment_id TEXT, deleted_at TEXT, created_at TEXT, updated_at TEXT',
-            'offers' => 'id TEXT PRIMARY KEY, balance REAL, type INTEGER, type_offre INTEGER, is_evaluation INTEGER DEFAULT 0, deleted_at TEXT',
+            'offers' => 'id TEXT PRIMARY KEY, balance REAL, type INTEGER, type_offre INTEGER, is_auto INTEGER DEFAULT 0, is_evaluation INTEGER DEFAULT 0, deleted_at TEXT',
             'cancellations' => 'id TEXT PRIMARY KEY, training_id TEXT, status INTEGER',
             'student_exams' => 'id TEXT PRIMARY KEY, student_id TEXT, date_examen TEXT, status INTEGER, result_permis INTEGER',
             'satisfaction_questions' => 'id TEXT PRIMARY KEY, survey_id TEXT, section TEXT, question TEXT, type TEXT, options TEXT, is_required INTEGER, sort_order INTEGER, is_active INTEGER, created_at TEXT, updated_at TEXT',
@@ -265,6 +267,29 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
         $this->assertSame(1, SatisfactionNotification::where('survey_id', $duringSurveyId)->where('candidate_id', $this->student->id)->count());
     }
 
+    public static function drivingPackageTypes(): array
+    {
+        return [
+            'manual package' => [false],
+            'automatic package' => [true],
+        ];
+    }
+
+    #[DataProvider('drivingPackageTypes')]
+    public function test_completed_monitor_review_activates_during_without_a_student_refresh_for_manual_and_automatic_packages(bool $isAuto): void
+    {
+        $offerId = (string) Str::uuid();
+        $this->createOffer($offerId, 10, isAuto: $isAuto);
+        $this->completedLesson($offerId, 450); // Exactly 7.5 hours (75% of 10)
+
+        $review = ReviewMonitor::query()->firstOrFail();
+        $this->assertTrue(app(SatisfactionOfferTriggerService::class)->processCompletedLesson($review));
+
+        $duringSurveyId = SatisfactionSurvey::where('stage', 'during_training')->value('id');
+        $this->assertSame(1, SatisfactionResponse::where('survey_id', $duringSurveyId)->where('candidate_id', $this->student->id)->where('status', 'started')->count());
+        $this->assertSame(1, SatisfactionNotification::where('survey_id', $duringSurveyId)->where('candidate_id', $this->student->id)->count());
+    }
+
     public function test_during_threshold_is_configurable_without_losing_exact_minute_calculation(): void
     {
         $offerId = (string) Str::uuid();
@@ -382,6 +407,7 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
 
         $afterSurveyId = SatisfactionSurvey::where('stage', 'after_training')->value('id');
         $this->assertSame(1, SatisfactionResponse::where('survey_id', $afterSurveyId)->where('candidate_id', $this->student->id)->count());
+        $this->assertSame(1, SatisfactionNotification::where('survey_id', $afterSurveyId)->where('candidate_id', $this->student->id)->count());
 
         StudentExam::withoutTimestamps(function () use ($afterSurveyId): void {
             $exam = StudentExam::query()->firstOrFail();
@@ -669,12 +695,14 @@ class SatisfactionEvaluationPurchaseTest extends TestCase
         int $type = OffreTypeStatusEnum::CONDUITE->value,
         int $typeOffre = OffreTypeEnum::FORFAIT->value,
         bool $isEvaluation = false,
+        bool $isAuto = false,
     ): void {
         DB::table('offers')->insert([
             'id' => $offerId,
             'balance' => $balance,
             'type' => $type,
             'type_offre' => $typeOffre,
+            'is_auto' => $isAuto ? 1 : 0,
             'is_evaluation' => $isEvaluation ? 1 : 0,
         ]);
         if ($type === OffreTypeStatusEnum::CONDUITE->value

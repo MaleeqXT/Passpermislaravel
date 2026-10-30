@@ -21,9 +21,13 @@ class StoreOffresController extends Controller
     {
         $user = Auth::user();
         $student = $user?->student;
-        $requestedStudentId = request()->validate([
+        $requestData = request()->validate([
             'student_id' => ['nullable', 'uuid', 'exists:students,id'],
-        ])['student_id'] ?? null;
+            'cart_offer_ids' => ['nullable', 'array', 'max:50'],
+            'cart_offer_ids.*' => ['uuid', 'exists:offers,id'],
+        ]);
+        $requestedStudentId = $requestData['student_id'] ?? null;
+        $cartOfferIds = $requestData['cart_offer_ids'] ?? [];
 
         if (!$student && $requestedStudentId && $user?->hasAnyRole(['admin', 'super-admin', 'secretary'])) {
             $student = Student::query()->find($requestedStudentId);
@@ -66,6 +70,35 @@ class StoreOffresController extends Controller
             'boite_type' => $boiteType,
         ]);
 
+        // A visitor may select a formula before authentication. Once they
+        // sign in, restore only those exact cart offers that are published in
+        // their agency. The regular catalogue remains restricted to the
+        // learner's registered gearbox; this exception exists only to finish
+        // the already selected checkout flow.
+        $checkoutOffers = collect();
+        if ($cartOfferIds !== []) {
+            $checkoutOffers = Offer::query()
+                ->whereIn('id', $cartOfferIds)
+                ->where('status', true)
+                ->where(function ($query) use ($zoneId) {
+                    FetchAllOffreRepo::applyZoneFilter($query, [$zoneId]);
+                })
+                ->get()
+                ->map(fn (Offer $offer) => FetchAllOffreRepo::applyAgencyPricing($offer, [$zoneId]));
+        }
+
+        // Highway-code products do not depend on manual/automatic training.
+        // Keep them available for either learner type so carts created by the
+        // public Code page can be restored after authentication.
+        $codeOffers = Offer::query()
+            ->where('status', true)
+            ->where('type_offre', 3)
+            ->where(function ($query) use ($zoneId) {
+                FetchAllOffreRepo::applyZoneFilter($query, [$zoneId]);
+            })
+            ->get()
+            ->map(fn (Offer $offer) => FetchAllOffreRepo::applyAgencyPricing($offer, [$zoneId]));
+
         // CPF catalogue records use their own publication lifecycle. When a
         // learner reaches checkout with a CPF item selected on the public site,
         // include the existing CPF offers for that learner's gearbox so the
@@ -95,8 +128,13 @@ class StoreOffresController extends Controller
             $offers->getCollection()
                 ->merge($menuOffers)
                 ->merge($cpfOffers)
+                ->merge($checkoutOffers)
+                ->merge($codeOffers)
                 ->unique('id')
-                ->filter(fn ($offer) => (int) $offer->is_auto === $boiteType || $offer->name === 'Pass Permis à la carte')
+                ->filter(fn ($offer) => (int) $offer->is_auto === $boiteType
+                    || $offer->name === 'Pass Permis à la carte'
+                    || (int) $offer->type_offre === 3
+                    || in_array($offer->id, $cartOfferIds, true))
                 ->values()
         );
 
