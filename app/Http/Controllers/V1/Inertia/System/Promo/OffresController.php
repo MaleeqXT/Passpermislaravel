@@ -62,12 +62,12 @@ public function index(Request $request)
     $activeCountQuery = Offer::query();
     FetchAllOffreRepo::applyZoneFilter($activeCountQuery, $zoneIds);
     $activeCount = $activeCountQuery
-        ->where('is_cpf', 0)->where('status', 1)->count();
+        ->where('status', 1)->count();
 
     $archivedCountQuery = Offer::query();
     FetchAllOffreRepo::applyZoneFilter($archivedCountQuery, $zoneIds);
     $archivedCount = $archivedCountQuery
-        ->where('is_cpf', 0)->where('status', 0)->count();
+        ->where('status', 0)->count();
 
     $cpfCountQuery = Offer::query();
     FetchAllOffreRepo::applyZoneFilter($cpfCountQuery, $zoneIds);
@@ -75,7 +75,7 @@ public function index(Request $request)
 
     $cartCountQuery = Offer::query();
     FetchAllOffreRepo::applyZoneFilter($cartCountQuery, $zoneIds);
-    $cartCount = $cartCountQuery->where('is_cpf', 0)->where('status',1)->where('is_offer_cart', 1)->count();
+    $cartCount = $cartCountQuery->where('is_offer_cart', 1)->count();
 
     $allCountQuery = Offer::query();
     FetchAllOffreRepo::applyZoneFilter($allCountQuery, $zoneIds);

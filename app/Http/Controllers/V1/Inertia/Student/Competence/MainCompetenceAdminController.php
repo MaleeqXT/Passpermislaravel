@@ -73,9 +73,11 @@ class  MainCompetenceAdminController extends Controller
     } catch (Exception $e) {
         DB::rollBack();
 
+        report($e);
+
         return response()->json([
             'success' => false,
-            'error' => $e->getMessage(),
+            'message' => 'Impossible de créer la compétence. Veuillez réessayer.',
         ], 500);
     }
 }

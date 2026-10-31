@@ -85,10 +85,11 @@ public function store(Zone $zone, StoreLieuxRequest $request)
     } catch (Exception $e) {
         DB::rollBack();
 
+        report($e);
+
         return response()->json([
             'success' => false,
-            'message' => 'Failed to create place.',
-            'error' => $e->getMessage(), // Production mein remove kar sakte ho
+            'message' => 'Impossible de créer le lieu. Veuillez réessayer.',
         ], 500);
     }
 }

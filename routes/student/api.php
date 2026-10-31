@@ -34,7 +34,7 @@ use App\Http\Controllers\Theory\TheoryStudentController;
 |
 */
 
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'slow'])->group(function () {
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified-or-student-preview', 'slow'])->group(function () {
     Route::delete('/preview-session', [StudentDashboardPreviewController::class, 'stop'])
         ->name('student.preview-session.stop');
     Route::prefix('theory')->controller(TheoryStudentController::class)->group(function () {
