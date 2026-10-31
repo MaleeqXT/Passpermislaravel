@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Theory;
 use App\Http\Controllers\Controller;
 use App\Models\Theory\TheoryAttemptAnswer;
 use App\Models\Theory\TheoryCategory;
+use App\Models\Theory\TheoryContentBank;
 use App\Models\Theory\TheoryQuestion;
 use App\Models\Theory\TheorySeries;
 use App\Models\Theory\TheoryStudentProgress;
@@ -37,7 +38,7 @@ class TheoryStudentController extends Controller
         $progress = TheoryStudentProgress::query()->where('student_id', $student->id)->get()->keyBy('category_id');
         $categories = TheoryCategory::query()
             ->where('is_active', true)
-            ->withCount(['questions as available_questions_count' => fn ($query) => $query->where('status', 'published')->where('is_active', true)])
+            ->withCount(['questions as available_questions_count' => fn ($query) => $query->forActiveStudentBank()->where('status', 'published')->where('is_active', true)])
             ->orderBy('sort_order')
             ->get()
             ->map(function (TheoryCategory $category) use ($progress) {
@@ -68,6 +69,7 @@ class TheoryStudentController extends Controller
         $series = TheorySeries::query()
             ->withCount('seriesQuestions')
             ->where('status', 'published')
+            ->whereHas('contentBank', fn ($bank) => $bank->where('status', 'active')->where('is_active', true))
             ->orderBy('type')
             ->orderBy('sort_order')
             ->get()
@@ -108,7 +110,7 @@ class TheoryStudentController extends Controller
             ->first();
 
         return response()->json(['data' => [
-            'published_question_count' => TheoryQuestion::query()->where('status', 'published')->where('is_active', true)->count(),
+            'published_question_count' => TheoryQuestion::query()->forActiveStudentBank()->where('status', 'published')->where('is_active', true)->count(),
             'answered_questions' => $answered,
             'average_success_rate' => $answered ? (int) round(($correct / $answered) * 100) : null,
             'tests_completed' => $attempts->where('mode', 'exam')->count(),
@@ -155,6 +157,7 @@ class TheoryStudentController extends Controller
         if ($data['mode'] === 'mock') {
             $questions = TheoryQuestion::query()
                 ->with('options:id,question_id,label,sort_order,is_correct')
+                ->forActiveStudentBank()
                 ->where('status', 'published')
                 ->where('is_active', true)
                 ->inRandomOrder()
@@ -166,10 +169,11 @@ class TheoryStudentController extends Controller
                 ->whereKey($data['series_id'])
                 ->where('type', $data['mode'])
                 ->where('status', 'published')
+                ->whereHas('contentBank', fn ($bank) => $bank->where('status', 'active')->where('is_active', true))
                 ->firstOrFail();
             $pool = $series->seriesQuestions
                 ->map(fn ($assignment) => $assignment->question)
-                ->filter(fn ($question) => $question && $question->status === 'published' && $question->is_active)
+                ->filter(fn ($question) => $question && $question->content_bank_id === $series->content_bank_id && $question->status === 'published' && $question->is_active)
                 ->values();
             $seenQuestionIds = TheoryAttemptAnswer::query()
                 ->whereHas('attempt', fn ($query) => $query->where('student_id', $student->id))
@@ -395,6 +399,9 @@ class TheoryStudentController extends Controller
             'answer_type' => $question->answer_type,
             'media_type' => $question->media_type,
             'media_path' => $question->media_path,
+            'image_path' => $question->image_path,
+            'video_path' => $question->video_path,
+            'audio_path' => $question->audio_path,
             'explanation' => $question->explanation,
             'official_reference' => $question->official_reference,
             'options' => $question->options->map(fn ($option) => ['id' => $option->id, 'label' => $option->label, 'sort_order' => $option->sort_order])->values()->all(),

@@ -42,6 +42,7 @@
     },
     "dependencies": {
         "@adersolutions/icons": "^1.0.8",
+        "@fal-ai/client": "^1.10.1",
         "@headlessui/vue": "^1.7.23",
         "@heroicons/vue": "^2.2.0",
         "@inertiajs/vue3": "^2.0.4",

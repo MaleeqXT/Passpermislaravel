@@ -20,6 +20,16 @@ class TheoryQuestion extends Model
         'reviewed_at' => 'datetime',
     ];
 
+    public function contentBank(): BelongsTo
+    {
+        return $this->belongsTo(TheoryContentBank::class, 'content_bank_id');
+    }
+
+    public function scopeForActiveStudentBank($query)
+    {
+        return $query->whereHas('contentBank', fn ($bank) => $bank->where('status', 'active')->where('is_active', true));
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(TheoryCategory::class, 'category_id');
@@ -33,5 +43,10 @@ class TheoryQuestion extends Model
     public function attemptAnswers(): HasMany
     {
         return $this->hasMany(TheoryAttemptAnswer::class, 'question_id');
+    }
+
+    public function parts(): HasMany
+    {
+        return $this->hasMany(TheoryQuestionPart::class, 'question_id')->orderBy('sort_order');
     }
 }

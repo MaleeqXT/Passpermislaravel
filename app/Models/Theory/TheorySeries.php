@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TheorySeries extends Model
@@ -13,6 +14,11 @@ class TheorySeries extends Model
     use HasUuids, SoftDeletes;
 
     protected $guarded = [];
+
+    public function contentBank(): BelongsTo
+    {
+        return $this->belongsTo(TheoryContentBank::class, 'content_bank_id');
+    }
 
     public function seriesQuestions(): HasMany
     {

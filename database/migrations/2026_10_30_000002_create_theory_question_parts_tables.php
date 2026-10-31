@@ -1,0 +1,31 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::create('theory_question_parts', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('question_id')->constrained('theory_questions')->cascadeOnDelete();
+            $table->text('question_text');
+            $table->string('answer_type', 16)->default('single');
+            $table->text('explanation')->nullable();
+            $table->unsignedTinyInteger('sort_order');
+            $table->timestamps();
+            $table->unique(['question_id', 'sort_order']);
+        });
+        Schema::create('theory_question_part_options', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('question_part_id')->constrained('theory_question_parts')->cascadeOnDelete();
+            $table->string('label', 1000);
+            $table->boolean('is_correct')->default(false);
+            $table->unsignedTinyInteger('sort_order');
+            $table->timestamps();
+            $table->unique(['question_part_id', 'sort_order']);
+        });
+    }
+    public function down(): void { Schema::dropIfExists('theory_question_part_options'); Schema::dropIfExists('theory_question_parts'); }
+};

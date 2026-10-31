@@ -29,6 +29,7 @@ use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\Theory\TheoryAdminController;
 use App\Http\Controllers\Theory\TheoryAdminSeriesController;
 use App\Http\Controllers\Theory\TheoryManualCodeAccessController;
+use App\Http\Controllers\Theory\TheoryAdminImportController;
 use App\Http\Controllers\V1\Inertia\CPF\CPFPagesController;
 
 use App\Http\Controllers\V1\Inertia\System\User\AdminUserController;
@@ -88,11 +89,13 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
       Route::prefix('theory')->controller(TheoryAdminController::class)->group(function () {
           Route::get('/categories', 'categories');
           Route::get('/statistics', 'statistics');
+          Route::get('/editorial-review', 'editorialReview');
           Route::get('/duplicates', 'duplicates');
           Route::get('/questions', 'index');
           Route::post('/questions', 'store');
           Route::put('/questions/{question}', 'update');
           Route::patch('/questions/{question}/publication', 'updatePublication');
+          Route::patch('/questions/{question}/review', 'review');
           Route::post('/questions/{question}/media', 'uploadMedia');
           Route::delete('/questions/{question}', 'destroy');
       });
@@ -105,6 +108,11 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
           Route::put('/series/{series}', 'update');
           Route::put('/series/{series}/questions', 'replaceQuestions');
           Route::patch('/series/{series}/publication', 'updatePublication');
+      });
+
+      Route::prefix('theory')->controller(TheoryAdminImportController::class)->group(function () {
+          Route::get('/imports', 'index');
+          Route::post('/imports', 'store');
       });
 
       Route::prefix('theory')->controller(TheoryManualCodeAccessController::class)->group(function () {
