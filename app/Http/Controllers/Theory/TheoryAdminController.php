@@ -11,10 +11,12 @@ use App\Services\Theory\TheoryQuestionDeduplicator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Process\Process;
 
 class TheoryAdminController extends Controller
 {
@@ -230,6 +232,40 @@ class TheoryAdminController extends Controller
         return response()->json(['message' => 'Média ajouté.', 'data' => $this->loadQuestion($question)]);
     }
 
+    /**
+     * Creates a cached, local neural narration for Admin Preview only. The
+     * source text always comes from the stored question, never from a browser
+     * request, so arbitrary shell input cannot reach the local Piper process.
+     */
+    public function narration(Request $request, TheoryQuestion $question): JsonResponse
+    {
+        $data = $request->validate([
+            'kind' => ['nullable', Rule::in(['question', 'explanation'])],
+            'part_id' => ['nullable', 'uuid'],
+        ]);
+
+        if (! $this->isOriginalDraftBank($question)) {
+            throw ValidationException::withMessages(['question' => 'La narration neuronale locale est réservée à la banque original-fr-2026.']);
+        }
+
+        $question->loadMissing(['options:id,question_id,label,sort_order', 'parts.options:id,question_id,label,sort_order']);
+        $kind = $data['kind'] ?? 'question';
+        $phrases = $kind === 'explanation'
+            ? $this->explanationNarration($question, $data['part_id'] ?? null)
+            : $this->questionNarration($question);
+
+        if ($phrases === []) {
+            throw ValidationException::withMessages(['narration' => 'Aucun texte ne peut être lu pour cette question.']);
+        }
+
+        $path = $this->piperNarrationPath($question, $kind, $data['part_id'] ?? null, $phrases);
+
+        return response()->json(['data' => [
+            'audio_url' => $this->publicMediaUrl($path),
+            'cached' => Storage::disk('public')->exists($path),
+        ]]);
+    }
+
     public function destroy(TheoryQuestion $question): JsonResponse
     {
         $question->update(['status' => 'archived', 'is_active' => false]);
@@ -411,6 +447,84 @@ class TheoryAdminController extends Controller
         return isset($parsed['path'])
             ? $parsed['path'].(isset($parsed['query']) ? '?'.$parsed['query'] : '')
             : $url;
+    }
+
+    private function questionNarration(TheoryQuestion $question): array
+    {
+        $parts = $question->parts->sortBy('sort_order')->values();
+        if ($parts->isEmpty()) {
+            return array_values(array_filter([
+                'Question. '.$question->question_text,
+                ...$question->options->sortBy('sort_order')->values()->map(fn ($option, int $index) => 'Réponse '.chr(65 + $index).' : '.$option->label)->all(),
+            ]));
+        }
+
+        $shared = $question->options->sortBy('sort_order')->values();
+        $phrases = [];
+        foreach ($parts as $partIndex => $part) {
+            $phrases[] = 'Question '.($partIndex + 1).'. '.$part->question_text;
+            $options = $part->options->isNotEmpty()
+                ? $part->options->sortBy('sort_order')->values()
+                : $shared->slice($partIndex * 2, 2)->values();
+            foreach ($options as $optionIndex => $option) {
+                $letter = chr(65 + ($part->options->isNotEmpty() ? ($partIndex * 2) + $optionIndex : ($partIndex * 2) + $optionIndex));
+                $phrases[] = 'Réponse '.$letter.' : '.$option->label;
+            }
+        }
+
+        return array_values(array_filter($phrases));
+    }
+
+    private function explanationNarration(TheoryQuestion $question, ?string $partId): array
+    {
+        if ($partId) {
+            $part = $question->parts->firstWhere('id', $partId);
+            if ($part?->explanation) {
+                return [$part->explanation];
+            }
+        }
+
+        return $question->explanation ? [$question->explanation] : [];
+    }
+
+    private function piperNarrationPath(TheoryQuestion $question, string $kind, ?string $partId, array $phrases): string
+    {
+        $text = trim(implode("\n\n", $phrases));
+        $hash = hash('sha256', implode('|', ['piper-fr-siwis-medium-v1', $kind, $partId, $text]));
+        $path = "theory/questions/{$question->id}/generated-audio/{$hash}.wav";
+
+        if (Storage::disk('public')->exists($path)) {
+            return $path;
+        }
+
+        $binary = (string) config('services.piper.binary');
+        $model = (string) config('services.piper.french_model');
+        if (! $binary || ! is_file($binary) || ! is_file($model) || ! is_file($model.'.json')) {
+            throw ValidationException::withMessages(['narration' => 'Le moteur de voix française locale n’est pas configuré.']);
+        }
+
+        $temporaryDirectory = storage_path('app/tts/tmp');
+        File::ensureDirectoryExists($temporaryDirectory);
+        $output = tempnam($temporaryDirectory, 'piper-').'.wav';
+
+        try {
+            $process = new Process([$binary, '--model', $model, '--output_file', $output]);
+            $process->setInput($text);
+            $process->setTimeout(45);
+            $process->run();
+
+            if (! $process->isSuccessful() || ! is_file($output) || filesize($output) < 1024) {
+                throw ValidationException::withMessages(['narration' => 'La narration française n’a pas pu être générée localement.']);
+            }
+
+            Storage::disk('public')->put($path, fopen($output, 'rb'));
+        } finally {
+            if (is_file($output)) {
+                @unlink($output);
+            }
+        }
+
+        return $path;
     }
 
     private function isOriginalDraftBank(TheoryQuestion $question): bool

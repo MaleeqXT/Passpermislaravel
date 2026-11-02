@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    // A local Piper installation keeps neural narration on the application
+    // machine. No TTS key or browser-exposed secret is required.
+    'piper' => [
+        'binary' => env('PIPER_BINARY'),
+        'french_model' => env('PIPER_FRENCH_MODEL', storage_path('app/tts/voices/fr_FR-siwis-medium.onnx')),
+    ],
+
 ];

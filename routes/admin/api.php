@@ -92,6 +92,7 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
           Route::get('/editorial-review', 'editorialReview');
           Route::get('/duplicates', 'duplicates');
           Route::get('/questions', 'index');
+          Route::post('/questions/{question}/narration', 'narration');
           Route::post('/questions', 'store');
           Route::put('/questions/{question}', 'update');
           Route::patch('/questions/{question}/publication', 'updatePublication');
