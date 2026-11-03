@@ -25,6 +25,7 @@ class AsyncLieuxMoniteurRequest extends FormRequest
         return [
             'lieux' => 'required|array',
             'lieux.*' => 'required|exists:lieux,id',
+            'monitor_id' => 'nullable|uuid|exists:monitors,id',
         ];
     }
 

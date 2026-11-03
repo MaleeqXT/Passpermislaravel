@@ -39,7 +39,8 @@ class FetchAllLieuxByMoniteurRepo
      */
     private static function getMonitorId(?array $attributes): ?string
     {
-        return auth()->user()->monitor->id ?? $attributes['monitor_id'] ?? null;
+        return auth()->user()?->monitor?->id
+            ?? ($attributes['monitor_id'] ?? null);
     }
 
     /**
