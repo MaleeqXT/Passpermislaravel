@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1\Inertia\System\Zone;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\Monitor\Lieux\AsyncLieuxMoniteurRequest;
+use App\Models\Roles\Monitor\User\Monitor;
 use App\Repository\V2\Admin\Zone\Lieux\FetchAllLieuxByMoniteurRepo;
 use App\Repository\V2\Monitor\Zone\SyncLieuxToMonitorRepo;
 use Exception;
@@ -43,8 +44,26 @@ class LieuxMonitorController extends Controller
     DB::beginTransaction();
 
     try {
+        $user = $request->user();
+        $monitor = $user?->monitor
+            ?? Monitor::query()->where('user_id', $user?->id)->first();
+
+        // An administrator previewing a monitor dashboard may update only the
+        // explicitly selected monitor; a direct monitor remains bound to self.
+        if (!$monitor && $user?->hasAnyRole(['admin', 'super-admin']) && $request->filled('monitor_id')) {
+            $monitor = Monitor::query()->find($request->input('monitor_id'));
+        }
+
+        if (!$monitor) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Compte moniteur requis pour enregistrer les lieux.',
+            ], 403);
+        }
+
         SyncLieuxToMonitorRepo::run(
-            auth()->user()->monitor,
+            $monitor,
             $request->validated()
         );
 
