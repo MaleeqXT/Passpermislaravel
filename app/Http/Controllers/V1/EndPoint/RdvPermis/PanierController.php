@@ -15,7 +15,19 @@ class PanierController extends Controller
 
     public function index(Request $request, PanierService $paniers): JsonResponse
     {
-        return $this->respond(fn () => $paniers->all($request->user()));
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'parPage' => ['nullable', 'integer', 'between:1,100'],
+            'employeAutoEcoleId' => ['nullable', 'uuid'],
+        ]);
+
+        return $this->respond(fn () => $paniers->all($request->user(), [
+            'page' => $validated['page'] ?? 1,
+            'par-page' => $validated['parPage'] ?? 20,
+            ...(($validated['employeAutoEcoleId'] ?? null) === null ? [] : [
+                'employe-auto-ecole-id' => $validated['employeAutoEcoleId'],
+            ]),
+        ]));
     }
 
     public function store(Request $request, PanierService $paniers): JsonResponse

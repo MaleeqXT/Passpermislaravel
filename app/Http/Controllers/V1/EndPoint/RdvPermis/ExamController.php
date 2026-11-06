@@ -17,7 +17,7 @@ class ExamController extends Controller
     {
         $validated = $request->validate([
             'groupePermis' => ['bail', 'required', 'in:A,B'],
-            'date' => ['bail', 'required', 'date_format:Y-m-d'],
+            'date' => ['bail', 'required', 'date_format:Y-m-d', 'after_or_equal:today'],
         ]);
 
         return $this->respond(fn () => $exams->all($request->user(), $validated['groupePermis'], $validated['date']));

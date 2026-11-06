@@ -11,9 +11,13 @@ use App\Http\Controllers\V1\EndPoint\RdvPermis\CandidateMandateController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\CandidateEligibilityController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\CentreController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\ExamController;
+use App\Http\Controllers\V1\EndPoint\RdvPermis\HeavyVehicleCandidateController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\PanierController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\PlanningController;
 use App\Http\Controllers\V1\EndPoint\RdvPermis\RdvPermisController;
+use App\Http\Controllers\V1\EndPoint\LivretNumerique\LessonController as LivretLessonController;
+use App\Http\Controllers\V1\EndPoint\LivretNumerique\LivretSyncController;
+use App\Http\Controllers\V1\EndPoint\LivretNumerique\TrainingContractController;
 use App\Http\Controllers\V1\EndPoint\Student\Info\StudentStatsController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\CartController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\SaleDetailsController;
@@ -107,8 +111,10 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary'])->prefix(
     Route::post('/connect', [RdvPermisController::class, 'connect'])->name('connect');
     Route::get('/current-school', [RdvPermisController::class, 'currentSchool'])->name('current-school');
     Route::get('/employees', [RdvPermisController::class, 'employees'])->name('employees');
+    Route::get('/trainer-assignments', [RdvPermisController::class, 'trainerAssignments'])->name('trainer-assignments');
     Route::post('/planning/recherche', [PlanningController::class, 'search'])->name('planning.search');
     Route::post('/candidats/recherche', [CandidateEligibilityController::class, 'search'])->name('candidates.eligibility');
+    Route::post('/candidats-groupe-lourd/recherche', [HeavyVehicleCandidateController::class, 'search'])->name('candidates.heavy-vehicle');
     Route::post('/candidats-mandats/recherche', [CandidateMandateController::class, 'search'])->name('candidates-mandates.search');
     Route::post('/centres/recherche', [CentreController::class, 'search'])->name('centres.search');
     Route::get('/centres-favoris', [CentreController::class, 'favorites'])->name('centres-favoris.index');
@@ -136,6 +142,27 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary'])->prefix(
         Route::delete('/{panierId}', 'destroy')->name('destroy');
         Route::post('/{panierId}/valider', 'validatePanier')->name('validate');
     });
+});
+
+// Internal Livret endpoints.  The browser never receives provider credentials
+// and there is deliberately no direct provider route exposed here.
+Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary'])->prefix('livret')->name('livret.')->group(function () {
+    Route::get('/contracts', [TrainingContractController::class, 'index']);
+    Route::post('/contracts', [TrainingContractController::class, 'store']);
+    Route::get('/contracts/{contract}', [TrainingContractController::class, 'show']);
+    Route::put('/contracts/{contract}', [TrainingContractController::class, 'update']);
+    Route::delete('/contracts/{contract}', [TrainingContractController::class, 'destroy']);
+    Route::post('/contracts/{contract}/retry', [TrainingContractController::class, 'retry']);
+    Route::get('/lessons', [LivretLessonController::class, 'index']);
+    Route::post('/lessons', [LivretLessonController::class, 'store']);
+    Route::get('/lessons/{lesson}', [LivretLessonController::class, 'show']);
+    Route::put('/lessons/{lesson}', [LivretLessonController::class, 'update']);
+    Route::delete('/lessons/{lesson}', [LivretLessonController::class, 'destroy']);
+    Route::post('/lessons/{lesson}/retry', [LivretLessonController::class, 'retry']);
+    Route::get('/trainers', [LivretSyncController::class, 'trainers']);
+    Route::get('/simulators', [LivretSyncController::class, 'simulators']);
+    Route::get('/sync', [LivretSyncController::class, 'status']);
+    Route::get('/sync/failures', [LivretSyncController::class, 'failures']);
 });
 
 Route::prefix('pages')->name('pages.')

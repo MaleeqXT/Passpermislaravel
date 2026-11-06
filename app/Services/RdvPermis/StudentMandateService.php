@@ -18,7 +18,7 @@ class StudentMandateService
     ) {}
 
     /**
-     * @return array{nom:string, numeroDossier:string, email?:string, groupePermis:string}
+     * @return array{nom:string, numeroDossier:string, email:string, groupePermis:string}
      */
     public function payloadFor(Student $student): array
     {
@@ -33,7 +33,11 @@ class StudentMandateService
             throw new InvalidArgumentException('Le numéro de dossier NEPH est requis avant la synchronisation RdvPermis.');
         }
 
-        if (filled($user->email) && ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+        if (! filled($user->email)) {
+            throw new InvalidArgumentException('Une adresse e-mail est requise avant la synchronisation RdvPermis.');
+        }
+
+        if (! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Une adresse e-mail valide est requise avant la synchronisation RdvPermis.');
         }
 
@@ -41,14 +45,11 @@ class StudentMandateService
             'nom' => trim((string) $user->last_name),
             // Do not convert to an integer: the government contract requires a string.
             'numeroDossier' => (string) $student->neph,
+            'email' => trim((string) $user->email),
             // PassPermis currently handles category-B candidates. Transmission
             // type (students.boite_type) is intentionally unrelated here.
             'groupePermis' => self::GROUPE_PERMIS,
         ];
-        if (filled($user->email)) {
-            $payload['email'] = trim((string) $user->email);
-        }
-
         return $payload;
     }
 

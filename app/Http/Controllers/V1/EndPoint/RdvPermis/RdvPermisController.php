@@ -139,6 +139,19 @@ class RdvPermisController extends Controller
         }
     }
 
+    public function trainerAssignments(Request $request, AutoEcoleService $autoEcole): JsonResponse
+    {
+        try {
+            $response = $autoEcole->trainerAssignments($request->user());
+
+            return response()->json($response->json(), $response->status());
+        } catch (RdvPermisApiException $exception) {
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
+        }
+    }
+
     private function frontendCallback(string $result): string
     {
         $url = config('rdvpermis.frontend_callback_url');

@@ -31,13 +31,28 @@ class RdvPermisPanierApiTest extends TestCase
         $user = $this->signIn();
         $this->bindToken($user);
         $fixture = [['id' => self::PANIER_ID, 'dateHeureExpiration' => '2026-09-25T11:30:00+00:00']];
-        Http::fake(['https://api.example.test/api/v2/auto-ecole/paniers' => Http::response($fixture)]);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/paniers?page=1&par-page=20' => Http::response($fixture)]);
 
         $this->getJson('/api/rdvpermis/paniers')->assertOk()->assertExactJson($fixture);
 
         Http::assertSent(fn ($request) => $request->method() === 'GET'
-            && $request->url() === 'https://api.example.test/api/v2/auto-ecole/paniers'
+            && $request->url() === 'https://api.example.test/api/v2/auto-ecole/paniers?page=1&par-page=20'
             && $request->body() === '');
+    }
+
+    public function test_panier_list_forwards_verified_pagination_and_employee_filter(): void
+    {
+        $user = $this->signIn();
+        $this->bindToken($user);
+        $employeeId = '22222222-2222-4222-8222-222222222222';
+        $url = 'https://api.example.test/api/v2/auto-ecole/paniers?page=2&par-page=50&employe-auto-ecole-id='.$employeeId;
+        $fixture = ['data' => [], 'nombreTotalPages' => 3, 'pageCourante' => 2, 'parPage' => 50, 'nombreTotalElements' => 101, 'nombreElementsPageCourante' => 50];
+        Http::fake([$url => Http::response($fixture)]);
+
+        $this->getJson('/api/rdvpermis/paniers?page=2&parPage=50&employeAutoEcoleId='.$employeeId)
+            ->assertOk()->assertExactJson($fixture);
+
+        Http::assertSent(fn ($request) => $request->method() === 'GET' && $request->url() === $url);
     }
 
     public function test_panier_creation_allows_an_omitted_employee_and_forwards_location(): void

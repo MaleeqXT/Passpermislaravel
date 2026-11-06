@@ -74,6 +74,8 @@ class ApiClient
                 'endpoint' => $path,
                 'user_id' => $user->getKey(),
                 'method' => $method,
+                'query' => $this->safeRequestPart($options['query'] ?? null),
+                'body' => $this->safeRequestPart($options['json'] ?? null),
                 'http_status' => $response->status(),
                 'rdvpermis_error' => $diagnostic['code'],
                 'rdvpermis_message' => $diagnostic['message'],
@@ -120,9 +122,13 @@ class ApiClient
             );
         }
 
+        $rejectionMessage = $providerCode === null
+            ? 'RdvPermis a refusé les données envoyées.'
+            : 'RdvPermis a refusé les données envoyées (code : '.$providerCode.').';
+
         return match (true) {
             $response->status() === 400 => new RdvPermisApiException(
-                'RdvPermis a refusé les données envoyées.',
+                $rejectionMessage,
                 400,
                 ...$exceptionDetails,
             ),
@@ -147,7 +153,7 @@ class ApiClient
                 ...$exceptionDetails,
             ),
             $response->status() === 422 => new RdvPermisApiException(
-                'RdvPermis a refusé les données envoyées.',
+                $rejectionMessage,
                 422,
                 ...$exceptionDetails,
             ),
@@ -203,6 +209,8 @@ class ApiClient
             'EXAMEN_DEJA_ANNULE' => 'Cet examen est déjà annulé dans RdvPermis.',
             'EXAMEN_NON_MODIFIABLE' => 'Cet examen ne peut plus être modifié dans RdvPermis.',
             'EXAMEN_NON_NOMINATIF' => 'Cet examen ne possède pas de candidat assigné.',
+            'STATUT_EXAMEN_NON_AUTORISE' => 'Le statut de cet examen ne permet pas cette opération dans RdvPermis.',
+            'DATE_DANS_LE_PASSE' => 'La date demandée ne peut pas être antérieure à aujourd’hui.',
             'PERMUTATION_IMPOSSIBLE' => 'Ces examens ne peuvent pas être permutés dans RdvPermis.',
             'NOMBRE_DE_REMPLACEMENTS_AUTORISES_ATTEINT' => 'Le nombre de remplacements autorisés est atteint.',
             default => null,
@@ -235,6 +243,11 @@ class ApiClient
         }
 
         return $payload;
+    }
+
+    private function safeRequestPart(mixed $value): ?array
+    {
+        return is_array($value) ? $this->redactSensitiveValues($value) : null;
     }
 
     private function safeProviderCode(mixed $code): ?string

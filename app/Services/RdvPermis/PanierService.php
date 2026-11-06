@@ -14,9 +14,9 @@ class PanierService
 
     public function __construct(private readonly ApiClient $client) {}
 
-    public function all(User $user): Response
+    public function all(User $user, array $query = []): Response
     {
-        return $this->client->get($user, self::PANIERS_PATH);
+        return $this->client->get($user, self::PANIERS_PATH, $query);
     }
 
     public function create(User $user, ?string $employeAutoEcoleId = null): Response

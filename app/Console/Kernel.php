@@ -3,6 +3,7 @@
 namespace App\Console;
 
 use App\Console\Commands\ImportStudents;
+use App\Jobs\RetryFailedLivretSyncJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel as ConsoleKernelContract;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -38,6 +39,9 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         $schedule->command('queue:work --tries=3 --backoff=120 --sleep=5 --stop-when-empty')->everyMinute();
+        // Only pending temporary work is retried automatically; business and
+        // schema failures require an explicit correction/retry by an operator.
+        $schedule->job(new RetryFailedLivretSyncJob)->everyTenMinutes()->withoutOverlapping();
     }
 
     protected function getArtisan()

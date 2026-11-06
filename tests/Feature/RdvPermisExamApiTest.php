@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\RdvPermis\TokenService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\Sanctum;
@@ -20,6 +21,13 @@ class RdvPermisExamApiTest extends TestCase
         config()->set('rdvpermis.timeout', 2);
         Http::preventStrayRequests();
         Log::spy();
+        Carbon::setTestNow('2026-10-01 12:00:00');
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_exam_listing_lookup_and_cancellation_use_current_v2_paths(): void
@@ -69,8 +77,23 @@ class RdvPermisExamApiTest extends TestCase
         Http::fake();
 
         $this->getJson('/api/rdvpermis/examens?groupePermis=CE&date=2026-10-20')->assertUnprocessable();
+        $this->getJson('/api/rdvpermis/examens?groupePermis=B&date=2000-01-01')->assertUnprocessable()->assertJsonValidationErrors('date');
         $this->postJson('/api/rdvpermis/examens/permutation', ['examenId1' => 'exam-1'])->assertUnprocessable();
         Http::assertNothingSent();
+    }
+
+    public function test_current_exam_status_and_past_date_errors_are_mapped_safely(): void
+    {
+        $user = $this->signIn();
+        $this->bindToken($user, 2);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/examens/exam-1' => Http::sequence()
+            ->push(['code' => 'STATUT_EXAMEN_NON_AUTORISE'], 422)
+            ->push(['code' => 'DATE_DANS_LE_PASSE'], 422)]);
+
+        $this->deleteJson('/api/rdvpermis/examens/exam-1')->assertUnprocessable()
+            ->assertExactJson(['message' => 'Le statut de cet examen ne permet pas cette opération dans RdvPermis.']);
+        $this->deleteJson('/api/rdvpermis/examens/exam-1')->assertUnprocessable()
+            ->assertExactJson(['message' => 'La date demandée ne peut pas être antérieure à aujourd’hui.']);
     }
 
     public function test_permutation_preserves_distinct_source_and_target_ids_and_makes_one_provider_request(): void

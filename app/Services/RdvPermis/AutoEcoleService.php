@@ -20,6 +20,8 @@ class AutoEcoleService
 
     private const MANDATES_PATH = '/api/v2/auto-ecole/mandats';
 
+    private const TRAINER_ASSIGNMENTS_PATH = '/api/v2/auto-ecole/affectations-formateurs';
+
     public function __construct(private readonly ApiClient $client) {}
 
     public function currentSchool(User $user): Response
@@ -33,10 +35,19 @@ class AutoEcoleService
     }
 
     /**
+     * The v2 path is verified, but its response schema is intentionally passed
+     * through untouched until the current Swagger schema is captured.
+     */
+    public function trainerAssignments(User $user): Response
+    {
+        return $this->client->get($user, self::TRAINER_ASSIGNMENTS_PATH);
+    }
+
+    /**
      * Creates a mandate for an already-existing RDVPermis candidate.
      * Candidate lookup/creation remains a separate government workflow.
      *
-     * @param array{nom:string, numeroDossier:string, email?:string, groupePermis:string} $payload
+     * @param array{nom:string, numeroDossier:string, email:string, groupePermis:string} $payload
      */
     public function createMandate(User $user, array $payload): Response
     {

@@ -15,6 +15,16 @@ class CandidateEligibilityService
         return $this->client->post($user, '/api/v2/auto-ecole/candidats/recherche', $criteria);
     }
 
+    /**
+     * The endpoint path is current-Swagger verified. Its request schema has
+     * not yet been captured, so this boundary deliberately forwards the
+     * supplied JSON unchanged rather than manufacturing a filter shape.
+     */
+    public function searchHeavyVehicle(User $user, array $criteria): Response
+    {
+        return $this->client->post($user, '/api/v2/auto-ecole/candidats-groupe-lourd/recherche', $criteria);
+    }
+
     public function requireEligible(User $user, string $creneauId, string $candidateId): void
     {
         $results = $this->search($user, ['filtre' => ['creneauId' => $creneauId]])->json();

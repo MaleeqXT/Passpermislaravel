@@ -36,6 +36,7 @@ class RdvPermisAutoEcoleApiTest extends TestCase
         return [
             'current school' => ['/api/rdvpermis/current-school', '/api/v2/auto-ecole/moi'],
             'employees' => ['/api/rdvpermis/employees', '/api/v2/auto-ecole/employes'],
+            'trainer assignments' => ['/api/rdvpermis/trainer-assignments', '/api/v2/auto-ecole/affectations-formateurs'],
         ];
     }
 

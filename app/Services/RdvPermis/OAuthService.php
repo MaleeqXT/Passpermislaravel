@@ -75,7 +75,10 @@ class OAuthService
         ]);
 
         try {
+            // A redirect from the token endpoint is an upstream failure, never
+            // a new authentication flow to follow with an authorization code.
             $response = Http::asForm()->timeout(config('rdvpermis.timeout'))
+                ->withOptions(['allow_redirects' => false])
                 ->post(config('rdvpermis.token_url'), [
                     'grant_type' => 'authorization_code',
                     'code' => $code,

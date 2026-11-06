@@ -186,6 +186,40 @@ class RdvPermisApiClientTest extends TestCase
         }
     }
 
+    public function test_an_unmapped_safe_provider_code_is_exposed_without_request_personal_data(): void
+    {
+        Log::spy();
+        config()->set('rdvpermis.api_url', 'https://api.example.test');
+        Http::fake(['https://api.example.test/*' => Http::response([
+            'code' => 'SCHEMA_INATTENDU',
+            'detail' => 'Unexpected filter shape',
+        ], 422)]);
+
+        $tokens = Mockery::mock(TokenService::class);
+        $tokens->shouldReceive('accessToken')->once()->andReturn('access-token');
+
+        try {
+            (new ApiClient($tokens))->post((new User)->forceFill(['id' => 1]), '/api/v2/auto-ecole/examens', [
+                'email' => 'candidate@example.test',
+                'numeroDossier' => '123456789012',
+                'groupePermis' => 'B',
+            ]);
+            $this->fail('The upstream validation response should throw an exception.');
+        } catch (RdvPermisApiException $exception) {
+            $this->assertSame(422, $exception->responseStatus);
+            $this->assertSame('RdvPermis a refusé les données envoyées (code : SCHEMA_INATTENDU).', $exception->userMessage);
+        }
+
+        Log::shouldHaveReceived('warning')->once()->with('RdvPermis API request failed', Mockery::on(
+            fn (array $context) => $context['method'] === 'POST'
+                && $context['body']['email'] === '[redacted]'
+                && $context['body']['numeroDossier'] === '[redacted]'
+                && $context['body']['groupePermis'] === 'B'
+                && ! str_contains(json_encode($context), 'candidate@example.test')
+                && ! str_contains(json_encode($context), '123456789012')
+        ));
+    }
+
     public function test_it_marks_the_connection_for_reauthentication_after_an_upstream_401(): void
     {
         Log::spy();

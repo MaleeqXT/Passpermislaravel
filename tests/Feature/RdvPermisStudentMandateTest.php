@@ -75,8 +75,8 @@ class RdvPermisStudentMandateTest extends TestCase
             && $request->data() === [
                 'nom' => 'Dupont',
                 'numeroDossier' => '01234567890909',
-                'groupePermis' => 'B',
                 'email' => 'louis.dupont@example.test',
+                'groupePermis' => 'B',
             ]);
         $record = RdvPermisSyncRecord::query()->sole();
         $this->assertSame('student_rdvpermis_mandate', $record->entity_type);
@@ -103,26 +103,15 @@ class RdvPermisStudentMandateTest extends TestCase
         Http::assertSent(fn ($request) => $request->data()['groupePermis'] === 'B');
     }
 
-    public function test_missing_local_email_is_omitted_and_provider_can_accept_existing_candidate(): void
+    public function test_missing_local_email_is_rejected_before_the_provider_call(): void
     {
-        $actor = $this->signIn('admin');
+        $this->signIn('admin');
         $this->seedStudent('01234567890909', 'Dupont', null);
-        $this->bindValidToken($actor);
-        Http::fake(['*' => Http::response(['id' => 'mandate', 'candidatId' => 'candidate'], 201)]);
-        $this->postJson(self::ROUTE, [])->assertCreated();
-        Http::assertSent(fn ($request) => ! array_key_exists('email', $request->data()));
-        $this->assertSame('candidate', RdvPermisSyncRecord::query()->sole()->remote_candidate_id);
-    }
+        Http::fake();
 
-    public function test_provider_email_requirement_is_authoritative_when_local_email_is_missing(): void
-    {
-        $actor = $this->signIn('admin');
-        $this->seedStudent('01234567890909', 'Dupont', null);
-        $this->bindValidToken($actor);
-        Http::fake(['*' => Http::response(['code' => 'EMAIL_MANQUANT'], 400)]);
-        $this->postJson(self::ROUTE, [])->assertBadRequest()
-            ->assertExactJson(['message' => 'Une adresse e-mail est requise pour ce candidat dans RdvPermis.']);
-        Http::assertSentCount(1);
+        $this->postJson(self::ROUTE, [])->assertUnprocessable()
+            ->assertExactJson(['message' => 'Une adresse e-mail est requise avant la synchronisation RdvPermis.']);
+        Http::assertNothingSent();
     }
 
     public function test_invalid_provided_email_is_rejected_locally(): void
@@ -168,7 +157,7 @@ class RdvPermisStudentMandateTest extends TestCase
 
     public static function missingLocalValues(): array
     {
-        return [['neph'], ['last_name']];
+        return [['neph'], ['last_name'], ['email']];
     }
 
     public function test_guests_and_non_administrative_users_cannot_send_a_mandate(): void
@@ -286,7 +275,7 @@ class RdvPermisStudentMandateTest extends TestCase
         $response = $this->postJson(self::ROUTE, [])
             ->assertBadRequest()
             ->assertExactJson([
-                'message' => 'RdvPermis a refusé les données envoyées.',
+                'message' => 'RdvPermis a refusé les données envoyées (code : MANDAT_INVALIDE).',
                 'rdvpermis_status' => 400,
                 'rdvpermis_error' => 'MANDAT_INVALIDE',
             ]);
