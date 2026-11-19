@@ -11,6 +11,7 @@
             <file>tests/Feature/RdvPermisFreshMigrationTest.php</file>
             <file>tests/Feature/RdvPermisHeavyVehicleCandidateApiTest.php</file>
             <file>tests/Feature/RdvPermisImportAccessTokenCommandTest.php</file>
+            <file>tests/Feature/RdvPermisLocalHandoffTest.php</file>
             <file>tests/Feature/RdvPermisOAuthCallbackTest.php</file>
             <file>tests/Feature/RdvPermisPanierApiTest.php</file>
             <file>tests/Feature/RdvPermisPanierSlotApiTest.php</file>

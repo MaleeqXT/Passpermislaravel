@@ -91,6 +91,23 @@ class RdvPermisController extends Controller
             'state_length' => strlen($request->string('state')->toString()),
         ]);
 
+        // A login started by a local development process returns here because
+        // the provider only knows this callback. Forward it untouched (the code
+        // is not used here) to the configured loopback callback.
+        if (($handoffTarget = $oauth->localHandoffTarget($request->string('state')->toString())) !== null) {
+            Log::info('RdvPermis OAuth callback forwarded to local development', [
+                'has_code' => $request->filled('code'),
+                'has_error' => $request->filled('error'),
+            ]);
+
+            $query = http_build_query(array_filter(
+                $request->only(['code', 'state', 'error', 'error_description']),
+                static fn (mixed $value): bool => is_string($value) && $value !== '',
+            ), '', '&', PHP_QUERY_RFC3986);
+
+            return redirect()->away($handoffTarget.(str_contains($handoffTarget, '?') ? '&' : '?').$query);
+        }
+
         if ($request->filled('error')) {
             Log::warning('RdvPermis OAuth authorization callback rejected', [
                 'stage' => 'authorization_callback',

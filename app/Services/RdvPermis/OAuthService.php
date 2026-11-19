@@ -14,7 +14,44 @@ use Throwable;
 
 class OAuthService
 {
+    /** Marks an OAuth state created by a local process using the deployed callback. */
+    public const LOCAL_STATE_PREFIX = 'local.';
+
     public function __construct(private readonly TokenService $tokens) {}
+
+    /**
+     * Local side of the handoff: this local process starts OAuth with the
+     * deployed redirect_uri and receives the code forwarded by that deployment.
+     */
+    public function localHandoffEnabled(): bool
+    {
+        return (bool) config('rdvpermis.local_handoff')
+            && app()->environment('local')
+            && $this->isLoopbackHost(parse_url((string) config('app.url'), PHP_URL_HOST));
+    }
+
+    /**
+     * Deployed side of the handoff: the loopback URL a local-marked callback is
+     * forwarded to, or null when this callback must be handled here. The target
+     * comes from configuration only and must be a loopback HTTP(S) URL, so the
+     * browser can only ever be sent back to the developer's own machine.
+     */
+    public function localHandoffTarget(string $state): ?string
+    {
+        if (! str_starts_with($state, self::LOCAL_STATE_PREFIX) || $this->localHandoffEnabled()) {
+            return null;
+        }
+
+        $target = (string) config('rdvpermis.local_handoff_url');
+        $scheme = strtolower((string) parse_url($target, PHP_URL_SCHEME));
+
+        if (! in_array($scheme, ['http', 'https'], true)
+            || ! $this->isLoopbackHost(trim((string) parse_url($target, PHP_URL_HOST), '[]'))) {
+            return null;
+        }
+
+        return $target;
+    }
 
     /**
      * A local Laravel process cannot consume an authorization callback sent to
@@ -26,7 +63,8 @@ class OAuthService
         $applicationHost = parse_url((string) config('app.url'), PHP_URL_HOST);
         $callbackHost = parse_url((string) config('rdvpermis.redirect_uri'), PHP_URL_HOST);
 
-        if (! $this->isLoopbackHost($applicationHost) || $this->isLoopbackHost($callbackHost)) {
+        if (! $this->isLoopbackHost($applicationHost) || $this->isLoopbackHost($callbackHost)
+            || $this->localHandoffEnabled()) {
             return null;
         }
 
@@ -40,7 +78,7 @@ class OAuthService
         // This is intentionally database-backed instead of session/cache-backed:
         // the browser callback does not carry the Sanctum bearer token and can
         // be handled by a different web worker than the connect request.
-        $state = bin2hex(random_bytes(32));
+        $state = ($this->localHandoffEnabled() ? self::LOCAL_STATE_PREFIX : '').bin2hex(random_bytes(32));
         $expiresAt = now()->addMinutes($this->stateTtlMinutes());
 
         RdvPermisOAuthState::query()->create([

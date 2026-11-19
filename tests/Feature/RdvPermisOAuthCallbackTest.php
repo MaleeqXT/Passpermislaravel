@@ -25,6 +25,7 @@ class RdvPermisOAuthCallbackTest extends TestCase
     public function test_successful_callback_redirects_to_the_frontend_connected_page(): void
     {
         $oauth = Mockery::mock(OAuthService::class);
+        $oauth->shouldReceive('localHandoffTarget')->with('valid-state')->andReturnNull();
         $oauth->shouldReceive('exchangeAuthorizationCode')
             ->once()
             ->with('one-time-code', 'valid-state')
@@ -38,6 +39,7 @@ class RdvPermisOAuthCallbackTest extends TestCase
     public function test_failed_callback_redirects_to_the_frontend_error_page_without_returning_the_code(): void
     {
         $oauth = Mockery::mock(OAuthService::class);
+        $oauth->shouldReceive('localHandoffTarget')->with('expired-state')->andReturnNull();
         $oauth->shouldReceive('exchangeAuthorizationCode')
             ->once()
             ->with('one-time-code', 'expired-state')

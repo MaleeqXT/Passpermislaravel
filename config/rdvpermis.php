@@ -19,6 +19,14 @@ return [
     ),
     'redirect_uri' => env('RDVPERMIS_REDIRECT_URI'),
     'frontend_callback_url' => env('RDVPERMIS_FRONTEND_CALLBACK_URL'),
+    // Local development through the deployed callback (no extra provider URI):
+    // - local .env:    RDVPERMIS_LOCAL_HANDOFF=true (APP_ENV=local, loopback APP_URL)
+    //                  keeps RDVPERMIS_REDIRECT_URI on the deployed callback and marks
+    //                  its OAuth state as local.
+    // - deployed .env: RDVPERMIS_LOCAL_HANDOFF_URL=http://localhost:8000/api/rdvpermis/callback
+    //                  forwards only local-marked callbacks to that loopback URL.
+    'local_handoff' => (bool) env('RDVPERMIS_LOCAL_HANDOFF', false),
+    'local_handoff_url' => env('RDVPERMIS_LOCAL_HANDOFF_URL'),
     'scopes' => array_values(array_filter(explode(' ', env(
         'RDVPERMIS_SCOPES',
         'rdvpermis livret_numerique:read livret_numerique:write offline_access'
