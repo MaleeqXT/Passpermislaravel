@@ -40,4 +40,17 @@ class Competency extends Model
     {
         return $this->hasOne(Rating::class);
     }
+
+    /**
+     * The admin booklet is a read-only summary.  A competency can have one
+     * rating per lesson/monitor, so the summary must use the most recently
+     * saved evaluation rather than an arbitrary historical row.
+     */
+    public function latestRating(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Rating::class)->ofMany([
+            'updated_at' => 'max',
+            'id' => 'max',
+        ]);
+    }
 }

@@ -368,6 +368,7 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
  Route::prefix('proposals')->name('proposals.')
         ->controller(AdminProposalTrainingController::class)->group(function () {
             Route::get('/', 'proposals')->name('index');
+            Route::post('/{trainingProposal}', 'update')->name('update');
         });
     Route::prefix('reservations')->name('reservations.')
         ->controller(ReservationAdminController::class)->group(function () {

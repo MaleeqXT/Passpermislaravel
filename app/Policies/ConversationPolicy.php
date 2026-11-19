@@ -21,12 +21,21 @@ class ConversationPolicy
             return false;
         }
 
-        // The historical thread stays readable by its participants after the
-        // final lesson. Sending remains subject to the existing active-contact
-        // rule, so an expired relationship cannot be reopened through chat.
         $contactId = $conversation->participants()
             ->where('user_id', '!=', $user->id)->value('user_id');
 
-        return $contactId && app(ChatContacts::class)->allows($user, (int) $contactId);
+        if (! $contactId) {
+            return false;
+        }
+
+        $contacts = app(ChatContacts::class);
+        if ($contacts->allows($user, (int) $contactId)) {
+            return true;
+        }
+
+        // Keep the normal active-contact boundary for new contacts. A monitor
+        // can nevertheless send a follow-up in an existing private thread with
+        // a student they are linked to by a real reservation.
+        return $contacts->allowsHistoricalStudentConversation($user, (int) $contactId);
     }
 }

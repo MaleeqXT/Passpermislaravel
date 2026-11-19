@@ -11,6 +11,8 @@
         "bugsnag/bugsnag-laravel": "^2.0",
         "dompdf/dompdf": "^3.1",
         "endroid/qr-code": "^5.1",
+        "getbrevo/brevo-php": "^6.0",
+        "guzzlehttp/guzzle": "^7.15",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "11.31.0",
         "laravel/jetstream": "*",

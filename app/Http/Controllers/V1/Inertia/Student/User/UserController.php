@@ -17,8 +17,12 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -109,6 +113,193 @@ class UserController extends Controller
         ]);
     }
 
+    private const AVAILABILITY_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+    private const NOTIFICATION_KEYS = ['courses', 'email', 'sms', 'news'];
+
+    private const DEFAULT_NOTIFICATIONS = ['courses' => true, 'email' => true, 'sms' => true, 'news' => false];
+
+    /** Save the weekly time slots the student is usually available for lessons. */
+    public function updateAccountAvailability(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user?->student, 404, 'Profil élève introuvable.');
+        $this->ensureAccountColumn('students', 'weekly_availability');
+
+        $data = $request->validate([
+            'availability' => ['present', 'array'],
+            'availability.*' => ['array', 'max:6'],
+            'availability.*.*.start' => ['required', 'date_format:H:i'],
+            'availability.*.*.end' => ['required', 'date_format:H:i'],
+        ]);
+
+        $availability = [];
+        foreach (self::AVAILABILITY_DAYS as $day) {
+            $slots = collect($data['availability'][$day] ?? [])
+                ->map(fn ($slot) => ['start' => $slot['start'], 'end' => $slot['end']])
+                ->sortBy('start')
+                ->values();
+
+            foreach ($slots as $index => $slot) {
+                if ($slot['start'] >= $slot['end']) {
+                    throw ValidationException::withMessages(['availability' => "L’heure de début doit précéder l’heure de fin ({$day})."]);
+                }
+                if ($index > 0 && $slot['start'] < $slots[$index - 1]['end']) {
+                    throw ValidationException::withMessages(['availability' => "Deux créneaux se chevauchent le {$day}."]);
+                }
+            }
+
+            $availability[$day] = $slots->all();
+        }
+
+        $unknownDays = array_diff(array_keys($data['availability']), self::AVAILABILITY_DAYS);
+        if ($unknownDays) {
+            throw ValidationException::withMessages(['availability' => 'Jour de disponibilité inconnu.']);
+        }
+
+        $user->student->update(['weekly_availability' => $availability]);
+
+        return response()->json([
+            'message' => 'Vos disponibilités ont été enregistrées.',
+            'data' => $this->accountPayload($user->fresh(), $user->zone_id),
+        ]);
+    }
+
+    /** Save the student's notification choices. */
+    public function updateAccountNotifications(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user?->student, 404, 'Profil élève introuvable.');
+        $this->ensureAccountColumn('students', 'notification_preferences');
+
+        $data = $request->validate(collect(self::NOTIFICATION_KEYS)
+            ->mapWithKeys(fn ($key) => [$key => ['required', 'boolean']])
+            ->all());
+
+        $user->student->update(['notification_preferences' => collect($data)->map(fn ($value) => (bool) $value)->all()]);
+
+        return response()->json([
+            'message' => 'Vos préférences de notifications ont été enregistrées.',
+            'data' => $this->accountPayload($user->fresh(), $user->zone_id),
+        ]);
+    }
+
+    /** Change the password after checking the current one; other devices are signed out. */
+    public function updateAccountPassword(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user?->student, 404, 'Profil élève introuvable.');
+        $this->ensureNotPreview($request);
+
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
+        ], [
+            'password.min' => 'Le nouveau mot de passe doit contenir au moins 8 caractères.',
+            'password.confirmed' => 'La confirmation ne correspond pas au nouveau mot de passe.',
+        ]);
+
+        if (! Hash::check($data['current_password'], (string) $user->password)) {
+            throw ValidationException::withMessages(['current_password' => 'Le mot de passe actuel est incorrect.']);
+        }
+        if (Hash::check($data['password'], (string) $user->password)) {
+            throw ValidationException::withMessages(['password' => 'Le nouveau mot de passe doit être différent de l’actuel.']);
+        }
+
+        DB::transaction(function () use ($user, $data, $request) {
+            $user->password = $data['password'];
+            if (Schema::hasColumn('users', 'password_changed_at')) {
+                $user->password_changed_at = now();
+            }
+            $user->save();
+
+            $currentId = $this->currentTokenId($request);
+            $user->tokens()->when($currentId, fn ($query) => $query->whereKeyNot($currentId))->delete();
+        });
+
+        return response()->json([
+            'message' => 'Votre mot de passe a été modifié. Vos autres appareils ont été déconnectés.',
+            'data' => $this->accountPayload($user->fresh(), $user->zone_id),
+        ]);
+    }
+
+    /** Devices currently signed in to this account (one API token per login). */
+    public function accountSessions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user?->student, 404, 'Profil élève introuvable.');
+        $currentId = $this->currentTokenId($request);
+
+        $sessions = $this->activeTokens($user)
+            ->orderByDesc('last_used_at')
+            ->orderByDesc('created_at')
+            ->get(['id', 'name', 'created_at', 'last_used_at', 'expires_at'])
+            ->map(fn ($token) => [
+                'id' => $token->id,
+                'created_at' => $token->created_at?->toIso8601String(),
+                'last_used_at' => $token->last_used_at?->toIso8601String(),
+                'current' => (string) $token->id === (string) $currentId,
+            ]);
+
+        return response()->json(['data' => $sessions]);
+    }
+
+    /** Sign out one device, or every device except this one when no id is given. */
+    public function revokeAccountSessions(Request $request, ?string $token = null): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user?->student, 404, 'Profil élève introuvable.');
+        $this->ensureNotPreview($request);
+        $currentId = $this->currentTokenId($request);
+
+        $query = $this->activeTokens($user)->when($currentId, fn ($tokens) => $tokens->whereKeyNot($currentId));
+        if ($token !== null) {
+            $query->whereKey($token);
+        }
+        $revoked = $query->delete();
+
+        return response()->json([
+            'message' => $revoked ? 'Session déconnectée.' : 'Aucune autre session à déconnecter.',
+            'data' => ['revoked' => $revoked],
+        ]);
+    }
+
+    private function activeTokens(User $user)
+    {
+        return $user->tokens()
+            ->where('name', '!=', 'student-dashboard-preview')
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()));
+    }
+
+    private function currentTokenId(Request $request): ?string
+    {
+        $token = $request->user()?->currentAccessToken();
+
+        return $token && isset($token->id) ? (string) $token->id : null;
+    }
+
+    /** Staff previewing a student's dashboard must never change that student's credentials. */
+    private function ensureNotPreview(Request $request): void
+    {
+        $token = $request->user()?->currentAccessToken();
+        abort_if($token && ($token->name ?? null) === 'student-dashboard-preview', 403, 'Action indisponible en mode aperçu.');
+    }
+
+    private function ensureAccountColumn(string $table, string $column): void
+    {
+        abort_unless(Schema::hasColumn($table, $column), 503, 'Cette fonctionnalité nécessite une mise à jour de la base de données.');
+    }
+
+    private function codeValidUntil(Student $student): ?string
+    {
+        if ($student->date_expiration_code) {
+            return Carbon::parse($student->date_expiration_code)->toDateString();
+        }
+
+        // The theory test (code) result is valid for 5 years from the date it was obtained.
+        return $student->date_code ? Carbon::parse($student->date_code)->addYears(5)->toDateString() : null;
+    }
+
     private function accountPayload(User $user, ?string $zoneId): array
     {
         $user->load(['zone', 'student.preferredMonitor.user']);
@@ -131,12 +322,27 @@ class UserController extends Controller
             'user' => $user->only(['id', 'first_name', 'last_name', 'name', 'email', 'phone', 'date_naissance', 'adresse', 'postal', 'ville', 'media', 'zone_id', 'profile_photo_url']),
             'student' => [
                 'id' => $student->id,
+                'neph' => $student->neph,
                 'boite_type' => $student->boite_type,
                 'created_at' => $student->created_at,
+                'date_expiration_code' => $student->date_expiration_code,
+                'date_code' => $student->date_code,
+                'code_valid_until' => $this->codeValidUntil($student),
                 'preferred_monitor_id' => $student->preferred_monitor_id,
                 'app_language' => $student->app_language,
                 'communication_preferences' => $student->communication_preferences ?? [],
+                'weekly_availability' => is_array($student->weekly_availability) ? $student->weekly_availability : null,
+                'notification_preferences' => array_merge(self::DEFAULT_NOTIFICATIONS, array_intersect_key(
+                    is_array($student->notification_preferences) ? $student->notification_preferences : [],
+                    self::DEFAULT_NOTIFICATIONS,
+                )),
             ],
+            'security' => [
+                'password_changed_at' => Schema::hasColumn('users', 'password_changed_at') ? $user->password_changed_at : null,
+                'two_factor_enabled' => (bool) $user->two_factor_confirmed_at,
+                'active_sessions' => $this->activeTokens($user)->count(),
+            ],
+            'settings_available' => Schema::hasColumn('students', 'weekly_availability'),
             'agency' => $user->zone?->only(['id', 'name']),
             'zones' => Zone::query()->where('status', 1)->orderBy('name')->get(['id', 'name']),
             'monitors' => $monitors,

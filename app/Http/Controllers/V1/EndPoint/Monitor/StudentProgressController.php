@@ -67,14 +67,17 @@ class StudentProgressController extends Controller
                     ->values()
                     ->map(function ($competency, int $questionIndex) use ($mainIndex, $ratingsByCompetency) {
                         $rating = $ratingsByCompetency->get($competency->id);
-                        $level = min(5, max(0, (int) ($rating?->rating ?? 0)));
+                        // Ratings use the three visible choices: 1 = failed,
+                        // 2 = needs improvement, 3 = mastered. Clamp older
+                        // five-level records so historic data remains readable.
+                        $level = min(3, max(0, (int) ($rating?->rating ?? 0)));
 
                         return [
                             'id' => (string) $competency->id,
                             'letter' => ($mainIndex + 1) . '.' . ($questionIndex + 1),
                             'title' => $competency->label,
                             'level' => $level,
-                            'status' => $level >= 5 ? 'acquired' : ($level > 0 ? 'in_progress' : 'neutral'),
+                            'status' => $level >= 3 ? 'acquired' : ($level === 2 ? 'in_progress' : ($level === 1 ? 'failed' : 'neutral')),
                             'lessonCount' => 0,
                             'observations' => $rating?->comment ?? '',
                             'studentEvaluation' => $rating?->evaluationDetail?->student_evaluation ?? false,
@@ -90,7 +93,7 @@ class StudentProgressController extends Controller
                     'id' => 'c' . ($mainIndex + 1),
                     'code' => 'C' . ($mainIndex + 1),
                     'title' => $mainCompetency->name,
-                    'progress' => $total ? (int) round(($levelTotal / ($total * 5)) * 100) : 0,
+                    'progress' => $total ? (int) round(($levelTotal / ($total * 3)) * 100) : 0,
                     'questions' => $questions->all(),
                 ];
             });
@@ -117,7 +120,7 @@ class StudentProgressController extends Controller
                     'id' => $student->id,
                     'name' => $student->user?->name ?? trim(($student->user?->first_name ?? '') . ' ' . ($student->user?->last_name ?? '')),
                 ],
-                'overallPercentage' => $totalQuestions ? (int) round(($levelTotal / ($totalQuestions * 5)) * 100) : 0,
+                'overallPercentage' => $totalQuestions ? (int) round(($levelTotal / ($totalQuestions * 3)) * 100) : 0,
                 'competencies' => $competencies->all(),
                 'maneuverCounts' => $this->maneuverCounts($maneuverReservations),
                 'hours' => [
@@ -150,7 +153,7 @@ class StudentProgressController extends Controller
     public function updateEvaluation(Request $request, Student $student, Competency $competency): JsonResponse
     {
         $validated = $request->validate([
-            'rating' => ['required', 'integer', 'min:0', 'max:5'],
+            'rating' => ['required', 'integer', 'min:0', 'max:3'],
             'observations' => ['nullable', 'string', 'max:10000'],
             'student_evaluation' => ['nullable', 'boolean'],
             'student_response' => ['nullable', 'string', 'max:10000'],

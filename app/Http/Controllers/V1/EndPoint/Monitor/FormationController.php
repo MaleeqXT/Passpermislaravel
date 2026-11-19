@@ -55,7 +55,7 @@ class FormationController extends Controller
         $monitor = $this->monitor($request);
         $this->authorizeStudent($monitor, $student);
         $lessons = $this->studentLessons($student)
-            ->with(['training.offer', 'evaluation', 'reviewMonitor', 'monitor.user', 'monitor.details'])
+            ->with(['training.offer', 'training.student', 'evaluation', 'reviewMonitor', 'monitor.user', 'monitor.details'])
             ->orderBy('date')->orderBy('start_at')->get();
         $ratings = Rating::whereIn('reservation_id', $lessons->pluck('id'))
             ->with(['competency', 'evaluationDetail'])->get()->groupBy('reservation_id');
@@ -347,6 +347,7 @@ class FormationController extends Controller
         $monitor = $this->monitor($request);
         $this->authorizeStudent($monitor, $student);
         $values = $this->validated($request, $monitor);
+        $this->ensureInitialEvaluationIsFirstHour($student, $values);
         if (Carbon::parse($values['date'].' '.$values['start_at'])->isPast()) {
             throw ValidationException::withMessages(['date' => 'Une nouvelle leçon doit être programmée dans le futur.']);
         }
@@ -375,6 +376,11 @@ class FormationController extends Controller
         $monitor = $this->monitor($request);
         $this->authorizeLesson($monitor, $student, $reservation);
         $values = $this->validated($request, $monitor, $this->maneuverCountsFromData($reservation->evaluation?->data ?? []));
+        // Lessons already saved with the initial evaluation keep it; the
+        // first-hour rule applies when the box is newly switched on.
+        if (! ($reservation->evaluation?->data['evaluation_initiale'] ?? false)) {
+            $this->ensureInitialEvaluationIsFirstHour($student, $values, $reservation);
+        }
 
         DB::transaction(function () use ($reservation, $student, $monitor, $values, $planning) {
             $this->lockEditable($reservation);
@@ -470,8 +476,10 @@ class FormationController extends Controller
             ];
             DocumentEvaluation::updateOrCreate(['reservation_id' => $reservation->id, 'student_id' => $student->id], ['monitor_id' => $monitor->id, 'data' => $data]);
 
+            // review_monitors has no monitor_id column: the lesson's monitor is
+            // already reservations.monitor_id. Writing it made signing fail.
             return ReviewMonitor::updateOrCreate(['reservation_id' => $reservation->id], [
-                'monitor_id' => $monitor->id, 'is_absent' => false,
+                'is_absent' => false,
                 'comment' => ($data['public_observations'] ?? '') ?: 'Leçon terminée et signée par le moniteur.',
             ]);
         });
@@ -530,7 +538,11 @@ class FormationController extends Controller
 
     private function authorizeLesson(Monitor $monitor, Student $student, Reservation $reservation): void
     {
-        abort_unless($this->lessons($monitor, $student)->whereKey($reservation->id)->exists(), 403, 'Leçon non autorisée.');
+        // A monitor can complete the record for a candidate assigned to them,
+        // even when an earlier appointment was created by another monitor.
+        // Signed and cancelled lessons remain protected by lockEditable().
+        $this->authorizeStudent($monitor, $student);
+        abort_unless($this->studentLessons($student)->whereKey($reservation->id)->exists(), 403, 'Leçon non autorisée.');
     }
 
     private function lockEditable(Reservation $reservation): void
@@ -625,6 +637,21 @@ class FormationController extends Controller
             'offer_id' => ['required', 'uuid', 'exists:offers,id'], 'lieu_id' => ['required', Rule::in($monitor->lieux()->pluck('lieux.id')->all())],
             'type' => ['required', 'string', 'max:100'], 'department' => ['nullable', Rule::in([$this->department($monitor), ''])],
             'boite_auto' => ['required', 'boolean'], 'evaluation_initiale' => ['required', 'boolean'], 'evaluation_permis' => ['required', 'boolean'],
+            'evaluation_permis_scores' => ['nullable', 'array'],
+            'evaluation_permis_scores.vehicle_installation' => ['nullable', Rule::in([0, 1, 2])],
+            'evaluation_permis_scores.vehicle_checks' => ['nullable', Rule::in([0, 1, 2, 3])],
+            'evaluation_permis_scores.vehicle_controls' => ['nullable', Rule::in([0, 1, 2, 3, 'E'])],
+            'evaluation_permis_scores.road_information' => ['nullable', Rule::in([0, 1, 2, 3, 'E'])],
+            'evaluation_permis_scores.road_speed' => ['nullable', Rule::in([0, 1, 2, 3, 'E'])],
+            'evaluation_permis_scores.road_rules' => ['nullable', Rule::in([0, 1, 2, 3, 'E'])],
+            'evaluation_permis_scores.sharing_communication' => ['nullable', Rule::in([0, 1, 2, 3, 'E'])],
+            'evaluation_permis_scores.sharing_road' => ['nullable', Rule::in([0, 1, 2, 3, 'E'])],
+            'evaluation_permis_scores.sharing_safety' => ['nullable', Rule::in([0, 1, 2, 3, 'E'])],
+            'evaluation_permis_scores.autonomy_analysis' => ['nullable', Rule::in([0, 0.5, 1])],
+            'evaluation_permis_scores.autonomy_adaptation' => ['nullable', Rule::in([0, 0.5, 1])],
+            'evaluation_permis_scores.autonomy_awareness' => ['nullable', Rule::in([0, 0.5, 1])],
+            'evaluation_permis_scores.bonus_courtesy' => ['nullable', Rule::in([0, 1])],
+            'evaluation_permis_scores.bonus_environment' => ['nullable', Rule::in([0, 1])],
             'is_absent' => ['required', 'boolean'],
             'public_observation' => ['nullable', 'string', 'max:10000'], 'teacher_observation' => ['nullable', 'string', 'max:10000'],
             'maneuvers' => ['present', 'array', 'max:100'], 'maneuvers.*' => ['required', 'string', 'max:300'],
@@ -686,10 +713,44 @@ class FormationController extends Controller
         ]);
         $data['evaluation_initiale'] = $values['evaluation_initiale'];
         $data['evaluation_permis'] = $values['evaluation_permis'];
+        if (array_key_exists('evaluation_permis_scores', $values)) {
+            $data['evaluation_permis_scores'] = $values['evaluation_permis_scores'] ?? [];
+        }
         $data['public_observations'] = $values['public_observation'] ?? '';
         $data['manoeuvres'] = array_values(array_merge($legacyManeuvers, $this->maneuverLabels($counts)));
         DocumentEvaluation::updateOrCreate(['student_id' => $student->id, 'reservation_id' => $reservation->id], ['monitor_id' => $monitor->id, 'data' => $data]);
         app(ManeuverOccurrenceService::class)->sync($reservation, $student, $monitor, $counts, $ratings);
+        $this->syncAbsenceReview($reservation, (bool) $values['is_absent'], $values['public_observation'] ?? '');
+    }
+
+    /**
+     * The absence register (StudentAbsenceController) and the satisfaction /
+     * milestone services read review_monitors.is_absent. Mirror the Formation
+     * "Élève absent" flag there so an absence recorded from a lesson is
+     * visible everywhere. A present lesson never creates a review row; it only
+     * clears an absence that was previously recorded.
+     */
+    private function syncAbsenceReview(Reservation $reservation, bool $absent, ?string $observation): void
+    {
+        $review = ReviewMonitor::query()->where('reservation_id', $reservation->id)->first();
+
+        if ($absent) {
+            if (! $review) {
+                ReviewMonitor::query()->create([
+                    'reservation_id' => $reservation->id,
+                    'is_absent' => true,
+                    'comment' => filled($observation) ? $observation : null,
+                ]);
+            } elseif (! $review->is_absent) {
+                $review->update(['is_absent' => true]);
+            }
+
+            return;
+        }
+
+        if ($review?->is_absent) {
+            $review->update(['is_absent' => false]);
+        }
     }
 
     private function initialEvaluationReservation(Monitor $monitor, Student $student): Reservation
@@ -1107,6 +1168,60 @@ class FormationController extends Controller
         return $reservation->duration_minutes === null ? (int) $reservation->hour * 60 : (int) $reservation->duration_minutes;
     }
 
+    /** @var array<string, string|null> first active lesson id per student, for this request */
+    private array $firstHourLessonIds = [];
+
+    private function isFirstHourLesson(Reservation $reservation): bool
+    {
+        $studentId = $reservation->training?->student_id;
+        if (! $studentId) {
+            return false;
+        }
+
+        if (! array_key_exists($studentId, $this->firstHourLessonIds)) {
+            $this->firstHourLessonIds[$studentId] = Reservation::query()
+                ->whereHas('training', fn ($query) => $query->where('student_id', $studentId))
+                ->with('training.cancellation')
+                ->orderBy('date')->orderBy('start_at')
+                ->get()
+                ->first(fn (Reservation $lesson) => ! $this->isCancelled($lesson))
+                ?->id;
+        }
+
+        return (string) $this->firstHourLessonIds[$studentId] === (string) $reservation->id;
+    }
+
+    private function studentIsAutomatic(Reservation $reservation): ?bool
+    {
+        $type = $reservation->training?->student?->boite_type;
+
+        return in_array((string) $type, ['0', '1'], true) ? (string) $type === '1' : null;
+    }
+
+    /**
+     * The initial evaluation is the student's first hour of driving: it may
+     * only be set on a lesson with no earlier, non-cancelled lesson.
+     */
+    private function ensureInitialEvaluationIsFirstHour(Student $student, array $values, ?Reservation $current = null): void
+    {
+        if (! $values['evaluation_initiale']) {
+            return;
+        }
+
+        $start = $values['date'].' '.$values['start_at'];
+        $hasEarlierLesson = $this->studentLessons($student)
+            ->with('training.cancellation')
+            ->when($current, fn ($query) => $query->whereKeyNot($current->id))
+            ->whereDate('date', '<=', $values['date'])
+            ->get()
+            ->contains(fn (Reservation $lesson) => ! $this->isCancelled($lesson)
+                && $lesson->date->toDateString().' '.$lesson->start_at->format('H:i') < $start);
+
+        if ($hasEarlierLesson) {
+            throw ValidationException::withMessages(['evaluation_initiale' => 'L’évaluation initiale est réservée à la première heure de l’élève.']);
+        }
+    }
+
     private function isCancelled(Reservation $reservation): bool
     {
         return ! $reservation->is_active || (int) $reservation->training?->cancellation?->status === 3;
@@ -1134,23 +1249,33 @@ class FormationController extends Controller
         $ratings = $lessonRatings ?? Rating::where('reservation_id', $reservation->id)->with(['competency', 'evaluationDetail'])->get();
         $maneuverCounts = $this->maneuverCountsFromData($data);
         $maneuverRatings = app(ManeuverOccurrenceService::class)->ratingsForReservation($reservation, $meta['maneuver_ratings'] ?? []);
+        // Évaluation Initiale: the saved choice, otherwise on for the
+        // student's first hour (earliest active lesson) if still editable.
+        $initialEvaluation = array_key_exists('evaluation_initiale', $data)
+            ? (bool) $data['evaluation_initiale']
+            : (! $signed && ! $cancelled && $this->isFirstHourLesson($reservation));
 
         return [
             'id' => $reservation->id, 'number' => $number, 'date' => $reservation->date->toDateString(),
-            'duration_minutes' => $duration, 'hour' => $duration / 60, 'start_at' => $reservation->start_at->format('H:i'), 'monitor_id' => $reservation->monitor_id,
+            'duration_minutes' => $duration, 'hour' => $duration / 60, 'start_at' => $reservation->start_at->format('H:i'),
+            'monitor_id' => $viewer?->id ?? $reservation->monitor_id, 'lesson_monitor_id' => $reservation->monitor_id,
             'offer_id' => $reservation->training?->offer_id, 'offer_name' => $reservation->training?->offer?->name,
             'lieu_id' => $reservation->lieu_id, 'type' => $reservation->training?->session_type ?: 'Prestation',
             'department' => ($meta['department'] ?? '') ?: $this->department($reservation->monitor),
-            'boite_auto' => (bool) ($meta['boite_auto'] ?? $reservation->training?->offer?->is_auto ?? false),
-            'evaluation_initiale' => $duration === 60 && (bool) ($data['evaluation_initiale'] ?? false),
+            // Until the monitor saves the lesson, the gearbox follows the
+            // student's file (0 = manuelle, 1 = automatique).
+            'boite_auto' => (bool) ($meta['boite_auto'] ?? $this->studentIsAutomatic($reservation) ?? $reservation->training?->offer?->is_auto ?? false),
+            'evaluation_initiale' => $duration === 60 && $initialEvaluation,
             'evaluation_permis' => (bool) ($data['evaluation_permis'] ?? false),
+            'evaluation_permis_scores' => is_array($data['evaluation_permis_scores'] ?? null) ? $data['evaluation_permis_scores'] : [],
             'public_observation' => $data['public_observations'] ?? '',
             'teacher_observation' => $meta['teacher_observation'] ?? $reservation->reviewMonitor?->comment ?? '',
             'maneuvers' => array_values((array) ($data['manoeuvres'] ?? $data['maneuvers'] ?? [])), 'maneuver_counts' => $maneuverCounts,
             'maneuver_ratings' => $maneuverRatings, 'has_schema' => is_array($meta['schema'] ?? null),
             'pedagogical_diagram' => $meta['pedagogical_diagram'] ?? null, 'is_absent' => $absent,
             'status' => $cancelled ? 'cancelled' : ($signed ? 'signed' : ($absent ? 'absent' : ($ended && $reservation->reviewMonitor?->comment ? 'completed' : ($ended ? 'past' : 'upcoming')))),
-            'signature' => $signed, 'can_manage' => ! $viewer || (string) $reservation->monitor_id === (string) $viewer->id, 'can_delete' => ! $signed && ! $ended && ! $cancelled,
+            'signature' => $signed, 'can_manage' => ! $signed && ! $cancelled,
+            'can_delete' => ! $signed && ! $ended && ! $cancelled && (! $viewer || (string) $reservation->monitor_id === (string) $viewer->id),
             'can_reschedule' => ! $signed && ! $ended && ! $cancelled,
             'competencies' => $ratings->map(fn ($rating) => ['id' => $rating->competency_id, 'title' => $rating->competency?->label, 'rating' => (int) $rating->rating, 'observations' => $rating->comment ?? '', 'studentEvaluation' => (bool) ($rating->evaluationDetail?->student_evaluation ?? false), 'studentResponse' => $rating->evaluationDetail?->student_response ?? '', 'activeTab' => $rating->evaluationDetail?->active_tab ?? 'pourquoi'])->values(),
         ];

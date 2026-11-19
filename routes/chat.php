@@ -1,9 +1,17 @@
 <?php
 
 use App\Http\Controllers\Chat\ChatController;
+use App\Http\Controllers\PushNotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('chat/avatars/{user}', [ChatController::class, 'avatar']);
+
+Route::middleware(['auth:sanctum', 'throttle:chat'])->prefix('push')->controller(PushNotificationController::class)->group(function () {
+    Route::get('devices', 'index');
+    Route::post('register', 'register')->middleware('throttle:chat-write');
+    Route::delete('unregister', 'unregister')->middleware('throttle:chat-write');
+    Route::patch('preferences', 'preferences')->middleware('throttle:chat-write');
+});
 
 Route::middleware(['auth:sanctum', \App\Http\Middleware\ResolveMonitorChat::class, 'role:student|monitor|admin|super-admin', 'throttle:chat'])
     ->controller(ChatController::class)->group(function () {
@@ -11,6 +19,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\ResolveMonitorChat::clas
         Route::get('chat/messages/{message}/attachment', 'legacyAttachment');
         Route::get('chat/session', 'session');
         Route::get('chat/unread', 'unread');
+        Route::get('chat/notifications', 'notifications');
+        Route::post('chat/notifications/read-all', 'readAllNotifications')->middleware('throttle:chat-write');
+        Route::post('chat/notifications/{message}/read', 'readNotification')->middleware('throttle:chat-write');
         Route::get('chat/contacts', 'contacts');
         Route::get('conversations', 'index');
         Route::post('conversations', 'store')->middleware('throttle:chat-write');

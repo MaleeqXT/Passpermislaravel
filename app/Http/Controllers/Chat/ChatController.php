@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Chat;
 use App\Events\Chat\MessageSent;
 use App\Events\Chat\MessageDeleted;
 use App\Events\Chat\MessagesRead;
+use App\Jobs\SendChatMessageEmail;
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -97,6 +98,81 @@ class ChatController extends Controller
         $count = Message::whereNull('read_at')->where('sender_id', '!=', $userId)
             ->whereHas('conversation.participants', fn ($q) => $q->where('user_id', $userId))->count();
         return response()->json(['user_id' => $userId, 'unread_count' => $count]);
+    }
+
+    /**
+     * The chat message itself is the durable notification record.  This keeps
+     * the notification history and its read state in the same transaction as
+     * the message, without making a second, duplicate inbox table.
+     */
+    public function notifications(Request $request)
+    {
+        $this->active($request);
+        $data = $request->validate(['limit' => 'sometimes|integer|min:1|max:50']);
+        $user = $request->user();
+
+        $query = $this->incomingMessagesFor($user->id);
+        $unreadCount = (clone $query)->whereNull('read_at')->count();
+        $messages = $query
+            ->with(['sender:id,name,first_name,last_name', 'conversation:id'])
+            ->latest('messages.id')
+            ->limit($data['limit'] ?? 20)
+            ->get();
+
+        return response()->json([
+            'data' => $messages->map(fn (Message $message) => $this->notificationView($message, $user->id)),
+            'unread_count' => $unreadCount,
+            'user_id' => (int) $user->id,
+        ]);
+    }
+
+    public function readNotification(Request $request, Message $message)
+    {
+        $this->active($request);
+        $userId = (int) $request->user()->id;
+        abort_unless($message->sender_id !== $userId && $message->conversation()
+            ->whereHas('participants', fn ($participants) => $participants->where('user_id', $userId))->exists(), 403);
+
+        if ($message->read_at === null) $message->update(['read_at' => now()]);
+        $message->loadMissing('sender:id,name,first_name,last_name');
+
+        return response()->json(['data' => $this->notificationView($message, $userId)]);
+    }
+
+    public function readAllNotifications(Request $request)
+    {
+        $this->active($request);
+        $userId = (int) $request->user()->id;
+        $changed = $this->incomingMessagesFor($userId)->whereNull('read_at')->update(['read_at' => now()]);
+
+        return response()->json(['marked_read' => $changed, 'unread_count' => 0]);
+    }
+
+    private function incomingMessagesFor(int $userId)
+    {
+        return Message::query()->where('sender_id', '!=', $userId)
+            ->whereHas('conversation.participants', fn ($participants) => $participants->where('user_id', $userId));
+    }
+
+    private function notificationView(Message $message, int $recipientId): array
+    {
+        $sender = $message->sender;
+        $senderName = trim(($sender?->first_name ?? '').' '.($sender?->last_name ?? '')) ?: ($sender?->name ?: 'Votre interlocuteur');
+        $preview = trim((string) $message->message) ?: 'Pièce jointe envoyée';
+
+        return [
+            'id' => 'message-'.$message->id,
+            'recipient_user_id' => $recipientId,
+            'sender_user_id' => (int) $message->sender_id,
+            'message_id' => (int) $message->id,
+            'conversation_id' => (string) $message->conversation_id,
+            'type' => 'chat.message',
+            'title' => $senderName,
+            'preview' => mb_strimwidth($preview, 0, 140, '…'),
+            'created_at' => $message->created_at?->toISOString(),
+            'read_at' => $message->read_at?->toISOString(),
+            'is_read' => $message->read_at !== null,
+        ];
     }
 
     public function index(Request $request)
@@ -237,6 +313,11 @@ class ChatController extends Controller
             ]);
         }
         $realtime = $this->publish(new MessageSent($message, $conversation));
+        // Email delivery is post-commit and queued, so provider outages can never
+        // fail a persisted message or disturb its existing Reverb broadcast.
+        if ($message->wasRecentlyCreated) {
+            SendChatMessageEmail::dispatch($message->id)->afterCommit();
+        }
         return response()->json(['data' => $message, 'realtime' => $realtime], $message->wasRecentlyCreated ? 201 : 200);
     }
 

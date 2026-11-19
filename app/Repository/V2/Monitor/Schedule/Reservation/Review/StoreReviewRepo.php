@@ -17,7 +17,10 @@ class StoreReviewRepo
     public static function run(Reservation $reservation, array $attributes = []): Model|Builder|null
     {
         try {
-            return $reservation->reviewMonitor()->create($attributes);
+            // review_monitors.reservation_id is unique and Formation may already
+            // have created the row when it recorded an absence. Update it
+            // instead of failing silently on the unique index.
+            return $reservation->reviewMonitor()->updateOrCreate(['reservation_id' => $reservation->id], $attributes);
         } catch (Exception $e) {
             // Log the exception message for debugging purposes
             info('Failed to Create : ' . $e->getMessage());

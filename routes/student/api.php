@@ -5,6 +5,7 @@ use App\Http\Controllers\V1\EndPoint\Student\Proposition\ProposalTrainingControl
 use App\Http\Controllers\V1\EndPoint\Student\Sale\SaleController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\Type\StripController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\SaleDetailsController;
+use App\Http\Controllers\V1\EndPoint\Student\Sale\StudentPaymentSummaryController;
 use App\Http\Controllers\V1\EndPoint\Student\Training\TrainingStudentController;
 use App\Http\Controllers\V1\EndPoint\Student\Training\TrainingAdminController;
 use Illuminate\Support\Facades\Route;
@@ -34,7 +35,7 @@ use App\Http\Controllers\Theory\TheoryStudentController;
 |
 */
 
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified-or-student-preview', 'slow'])->group(function () {
+Route::middleware(['student-portal-auth', 'verified-or-student-preview', 'slow'])->group(function () {
     Route::delete('/preview-session', [StudentDashboardPreviewController::class, 'stop'])
         ->name('student.preview-session.stop');
     Route::prefix('theory')->controller(TheoryStudentController::class)->group(function () {
@@ -51,6 +52,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified-o
     Route::get('/progress', [StudentProgressController::class, 'show'])->name('student.progress.show');
     Route::get('/progress/lessons/{reservation}', [StudentProgressController::class, 'lessonDetail'])->name('student.progress.lessons.show');
     Route::get('/bilans', [BilanController::class, 'showForStudent'])->name('student.bilans.show');
+    Route::post('/bilans/decision', [BilanController::class, 'decide'])->middleware('throttle:6,1')->name('student.bilans.decision');
     Route::prefix('formation')->controller(StudentFormationController::class)->group(function () {
         Route::get('/', 'index')->name('student.formation.index');
         Route::get('/lessons/{reservation}/schema', 'schema')->name('student.formation.schema');
@@ -65,6 +67,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified-o
         Route::get('/account', 'accountApi');
         Route::post('/account', 'updateAccountPersonal');
         Route::put('/account/preferences', 'updateAccountPreferences');
+        Route::put('/account/availability', 'updateAccountAvailability');
+        Route::put('/account/notifications', 'updateAccountNotifications');
+        Route::put('/account/password', 'updateAccountPassword')->middleware('throttle:6,1');
+        Route::get('/account/sessions', 'accountSessions');
+        Route::delete('/account/sessions', 'revokeAccountSessions');
+        Route::delete('/account/sessions/{token}', 'revokeAccountSessions')->whereNumber('token');
     });
 
     Route::prefix('documents')->controller(StudentDocumentController::class)->group(function () {
@@ -110,6 +118,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified-o
     Route::get('/offers', [StoreOffresController::class, 'apiIndex'])->name('offers.index');
     Route::get('/wallets', [WalletController::class, 'currentStudentWallets'])->name('wallets.index');
     Route::get('/sales', [SaleDetailsController::class, 'current'])->name('sales.index');
+    Route::get('/payment-summary', [StudentPaymentSummaryController::class, 'show'])->name('payments.summary');
+    Route::get('/payments/{sale}/invoice', [StudentPaymentSummaryController::class, 'download'])->name('payments.invoice');
 
     Route::post('/approvels', [HourRequestController::class, 'store'])->name('approvels.store');
 

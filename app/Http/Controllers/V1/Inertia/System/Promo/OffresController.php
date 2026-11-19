@@ -17,6 +17,7 @@ use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 use Psr\Container\ContainerExceptionInterface;
@@ -148,7 +149,7 @@ public function index(Request $request)
     DB::beginTransaction();
 
     try {
-        $attributes = $request->except(['media', '_method']);
+        $attributes = $this->withoutMissingEvaluationService($request->except(['media', '_method']));
 
         $attributes['zone_id'] = is_array($attributes['zone_id'] ?? null)
             ? $attributes['zone_id']
@@ -206,7 +207,7 @@ public function edit(Offer $offer)
     DB::beginTransaction();
 
     try {
-        $attributes = $request->except(['media', '_method']);
+        $attributes = $this->withoutMissingEvaluationService($request->except(['media', '_method']));
 
         if (isset($attributes['zone_id']) && !is_array($attributes['zone_id'])) {
             $attributes['zone_id'] = [$attributes['zone_id']];
@@ -335,4 +336,17 @@ public function edit(Offer $offer)
         ], 500);
     }
 }
+
+    /**
+     * The offer form always sends evaluation_service. Until the migration that
+     * adds the column has run, drop it so saving an offer keeps working.
+     */
+    private function withoutMissingEvaluationService(array $attributes): array
+    {
+        if (array_key_exists('evaluation_service', $attributes) && ! Schema::hasColumn('offers', 'evaluation_service')) {
+            unset($attributes['evaluation_service']);
+        }
+
+        return $attributes;
+    }
 }

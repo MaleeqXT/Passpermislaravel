@@ -2,6 +2,7 @@
 
 namespace App\Repository\V2\Monitor\Schedule\Reservation\TrainingProposal;
 
+use App\Enums\V2\Student\Schedule\Wallet\WalletTypeEnum;
 use App\Models\Roles\Student\Schedule\TrainingProposal;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -85,7 +86,11 @@ class FetchAllTrainingProposalByAdminRepo
         return [
             'reservation.monitor.user:id,name,media,email,phone',
             'reservation.lieu.zone',
-            'student.user:id,name,media,email,phone'
+            'reservation.training.offer:id,name',
+            'student.user:id,name,media,email,phone',
+            'student.wallets' => fn ($query) => $query
+                ->where('status', WalletTypeEnum::ACTIVE->value)
+                ->with('offer:id,name'),
         ];
     }
 }

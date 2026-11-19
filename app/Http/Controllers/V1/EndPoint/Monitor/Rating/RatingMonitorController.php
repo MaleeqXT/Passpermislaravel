@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1\EndPoint\Monitor\Rating;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\Monitor\Schedule\UpdateRatingMonitorRequest;
+use App\Models\DocumentEvaluation;
 use App\Models\Roles\Monitor\Schedule\Reservation;
 use App\Models\Roles\Monitor\Schedule\ReviewMonitor;
 use App\Repository\V2\Monitor\Schedule\Reservation\Review\EditReviewRepo;
@@ -37,6 +38,9 @@ class RatingMonitorController extends Controller
         DB::beginTransaction();
         try {
             $review = StoreReviewRepo::run($reservation, $request->validated());
+            if ($review) {
+                $this->syncFormationAbsence($reservation->id, $request->validated());
+            }
             DB::commit();
             if ($review) {
                 app(SatisfactionOfferTriggerService::class)->processCompletedLesson($review);
@@ -60,6 +64,9 @@ class RatingMonitorController extends Controller
         DB::beginTransaction();
         try {
             $updated = EditReviewRepo::run($reviewMonitor, $request->validated());
+            if ($updated) {
+                $this->syncFormationAbsence($reviewMonitor->reservation_id, $request->validated());
+            }
             DB::commit();
             if ($updated) {
                 app(SatisfactionOfferTriggerService::class)->processCompletedLesson($reviewMonitor->fresh());
@@ -70,5 +77,26 @@ class RatingMonitorController extends Controller
             session()->flash('error', 'Une erreur est survenue lors de la suppression du Review');
             throw $e;
         }
+    }
+
+    /**
+     * Formation reads data.formation.is_absent before review_monitors. Keep an
+     * existing, unsigned Formation record in step with an absence recorded
+     * from the lesson notice so both screens and the absence register agree.
+     */
+    private function syncFormationAbsence(?string $reservationId, array $values): void
+    {
+        if (! $reservationId || ! array_key_exists('is_absent', $values)) {
+            return;
+        }
+
+        $evaluation = DocumentEvaluation::query()->where('reservation_id', $reservationId)->first();
+        $data = $evaluation?->data;
+        if (! is_array($data) || ! array_key_exists('formation', $data) || isset($data['formation_signature'])) {
+            return;
+        }
+
+        $data['formation']['is_absent'] = (bool) $values['is_absent'];
+        $evaluation->update(['data' => $data]);
     }
 }

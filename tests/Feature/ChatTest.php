@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Events\Chat\MessageSent;
 use App\Events\Chat\MessageDeleted;
 use App\Events\Chat\MessagesRead;
+use App\Jobs\SendChatMessageEmail;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -12,6 +13,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -33,6 +35,9 @@ class ChatTest extends TestCase
         DB::purge('sqlite');
         $this->withoutMiddleware(HandleInertiaRequests::class);
         Event::fake([MessageSent::class, MessagesRead::class, MessageDeleted::class]);
+        // Chat delivery is covered by its dedicated mail/job tests. Keep this
+        // authorization suite independent from the asynchronous mail transport.
+        Queue::fake();
         (require database_path('migrations/2024_12_24_000006_create_users_table.php'))->up();
         (require database_path('migrations/2025_01_01_220640_create_permission_tables.php'))->up();
         Schema::create('monitors', function (Blueprint $t) { $t->uuid('id')->primary(); $t->foreignId('user_id'); $t->softDeletes(); });
@@ -117,6 +122,7 @@ class ChatTest extends TestCase
         $payload['message'] = 'different';
         $this->postJson($url, $payload)->assertStatus(409);
         $this->assertSame(1, Message::count());
+        Queue::assertPushed(SendChatMessageEmail::class, 1);
         Event::assertDispatched(MessageSent::class, function ($event) use ($student, $monitor, $conversation) {
             $names = array_map(fn ($channel) => $channel->name, $event->broadcastOn());
             return in_array('private-conversation.'.$conversation->id, $names)
@@ -161,20 +167,16 @@ class ChatTest extends TestCase
         $this->get('/api/chat/messages/'.$message->id.'/attachment')->assertOk();
     }
 
-    public function test_participants_can_view_historical_conversation_but_cannot_send_after_their_last_lesson(): void
+    public function test_monitor_can_follow_up_in_a_historical_conversation_but_student_cannot_reopen_it(): void
     {
-        Storage::fake('public');
         $student = $this->user('student'); $monitor = $this->user('monitor'); $outsider = $this->user('admin');
         $this->upcomingAssignment($student, $monitor);
         $conversation = $this->conversation($student, $monitor);
 
         Sanctum::actingAs($student);
-        $this->post("/api/conversations/{$conversation->id}/messages", [
+        $this->postJson("/api/conversations/{$conversation->id}/messages", [
             'message' => 'Message conservé après la formation.',
-            'attachments' => [UploadedFile::fake()->create('historique.pdf', 10, 'application/pdf')],
         ])->assertCreated();
-        $message = Message::query()->latest('id')->firstOrFail();
-        $attachment = $message->attachments()->firstOrFail();
 
         DB::table('reservations')->update([
             'date' => now()->subDay()->toDateString(),
@@ -185,13 +187,15 @@ class ChatTest extends TestCase
             ->assertJsonPath('data.0.id', $conversation->id);
         $this->getJson("/api/conversations/{$conversation->id}/messages")->assertOk()
             ->assertJsonPath('data.0.message', 'Message conservé après la formation.');
-        $this->get('/api/chat/attachments/'.$attachment->id)->assertOk();
         $this->postJson("/api/conversations/{$conversation->id}/messages", ['message' => 'Nouveau message'])
             ->assertForbidden();
 
+        Sanctum::actingAs($monitor);
+        $this->postJson("/api/conversations/{$conversation->id}/messages", ['message' => 'Suivi du moniteur'])
+            ->assertCreated()->assertJsonPath('data.sender_id', $monitor->id);
+
         Sanctum::actingAs($outsider);
         $this->getJson("/api/conversations/{$conversation->id}/messages")->assertForbidden();
-        $this->getJson('/api/chat/attachments/'.$attachment->id)->assertForbidden();
     }
 
     public function test_cursor_pagination_and_read_watermark_do_not_mark_unseen_messages(): void

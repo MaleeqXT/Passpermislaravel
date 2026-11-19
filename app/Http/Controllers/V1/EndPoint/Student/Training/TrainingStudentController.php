@@ -49,7 +49,13 @@ class TrainingStudentController extends Controller
         ]);
     }
 
-    /** Courses belonging to the authenticated student, for one calendar month. */
+    /**
+     * Courses belonging to the authenticated student.
+     *
+     * The optional month is used only to mark the calendar. When no date is
+     * supplied, the complete lesson history is returned so the student can
+     * browse upcoming, past, and cancelled lessons in their respective tabs.
+     */
     public function courses(Request $request): JsonResponse
     {
         $student = $this->resolveStudent($request);
@@ -63,7 +69,7 @@ class TrainingStudentController extends Controller
             'month' => ['nullable', 'date_format:Y-m'],
         ]);
         $month = Carbon::createFromFormat('Y-m', $validated['month'] ?? now()->format('Y-m'))->startOfMonth();
-        $selectedDate = $validated['date'] ?? now()->toDateString();
+        $selectedDate = $validated['date'] ?? null;
 
         $trainings = Training::withTrashed()
             ->with([
@@ -85,10 +91,13 @@ class TrainingStudentController extends Controller
             ->unique()
             ->values();
 
+        $courses = $selectedDate
+            ? $trainings->filter(fn (Training $training) => $training->reservation->date?->toDateString() === $selectedDate)
+            : $trainings;
+
         return response()->json([
-            'courses' => $trainings
-                ->filter(fn (Training $training) => $training->reservation->date?->toDateString() === $selectedDate)
-                ->sortBy('reservation.start_at')
+            'courses' => $courses
+                ->sortBy(fn (Training $training) => sprintf('%s %s', $training->reservation->date?->toDateString(), $training->reservation->start_at?->format('H:i')))
                 ->map(fn (Training $training) => $this->coursePayload($training))
                 ->values(),
             'activity_dates' => $activityDates,

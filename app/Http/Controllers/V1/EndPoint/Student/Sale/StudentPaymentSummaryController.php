@@ -8,9 +8,11 @@ use App\Enums\V2\Student\Schedule\Sale\SalePaymentMethodEnum;
 use App\Http\Controllers\Controller;
 use App\Models\Roles\Admin\Offer\Cart\Cart;
 use App\Models\Roles\Admin\Offer\Order\Sale;
+use App\Models\Roles\Student\User\Student;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Stripe\StripeClient;
 
@@ -22,9 +24,9 @@ class StudentPaymentSummaryController extends Controller
      * are fabricated here; upcoming_installments remains empty until a real
      * schedule source is introduced.
      */
-    public function show(): JsonResponse
+    public function show(Request $request): JsonResponse
     {
-        $student = auth()->user()?->student?->load('user');
+        $student = $this->resolveStudent($request);
 
         if (!$student) {
             return response()->json(['message' => 'Profil élève introuvable.'], 422);
@@ -147,9 +149,9 @@ class StudentPaymentSummaryController extends Controller
     }
 
     /** Stream the selected paid receipt using the existing student invoice view. */
-    public function download(Sale $sale): Response
+    public function download(Request $request, Sale $sale): Response
     {
-        $student = auth()->user()?->student;
+        $student = $this->resolveStudent($request);
         abort_unless($student && $sale->student_id === $student->id, 403);
         abort_unless($sale->payment_status === SaleStatusEnum::PAID->value, 404);
 
@@ -172,5 +174,38 @@ class StudentPaymentSummaryController extends Controller
 
         return Pdf::loadView('pdf.normal.student-invoice', $invoiceData)
             ->stream('facture-' . Carbon::parse($sale->created_at)->format('Y-m-d') . '.pdf');
+    }
+
+    /**
+     * Resolve the actual student behind a temporary staff preview. Normally
+     * Sanctum authenticates the student token directly. The explicit fallback
+     * keeps a same-origin admin cookie from making the preview payment page
+     * fail, and is limited to staff who may access that candidate.
+     */
+    private function resolveStudent(Request $request): ?Student
+    {
+        $user = $request->user();
+        if ($user?->student) {
+            return $user->student->load('user');
+        }
+
+        $studentId = $request->string('student_id')->toString();
+        if (!$studentId || !$user?->hasAnyRole(['admin', 'super-admin', 'secretary'])) {
+            return null;
+        }
+
+        $student = Student::query()->with('user')->find($studentId);
+        if (!$student) {
+            return null;
+        }
+
+        if ($user->hasRole('secretary')
+            && $user->zone_id
+            && $student->user?->zone_id
+            && $user->zone_id !== $student->user->zone_id) {
+            return null;
+        }
+
+        return $student;
     }
 }

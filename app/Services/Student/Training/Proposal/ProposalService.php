@@ -5,6 +5,7 @@ namespace App\Services\Student\Training\Proposal;
 
 use App\Enums\V2\Admin\Popular\CodeErrorsEnum;
 use App\Enums\V2\Monitor\Reservation\Training\Proposal\ProposalStatusEnum;
+use App\Enums\V2\Student\Schedule\Wallet\WalletTypeEnum;
 use App\Models\Roles\Student\Schedule\Training;
 use App\Models\Roles\Student\Schedule\TrainingProposal;
 use App\Repository\V2\Monitor\Schedule\Reservation\TrainingProposal\EditTrainingProposalRepo;
@@ -78,16 +79,46 @@ class ProposalService implements ProposalInterface
 
     public function updateAndCreatePropositionSession(TrainingProposal $trainingProposal, array $attributes): TrainingProposal|Model|null
     {
-        // Update the training proposal
+        $status = (int) $attributes['status'];
+
+        if ($trainingProposal->status === ProposalStatusEnum::RESERVER->value) {
+            $this->flashErrorAndThrowException(CodeErrorsEnum::PROPOSITION_HAS_ALREADY_ACTIVATED->value);
+        }
+
+        $reservation = $trainingProposal->reservation;
+        abort_unless($reservation, 422, 'Le créneau de cette proposition est introuvable.');
+
+        if ($status === ProposalStatusEnum::RESERVER->value) {
+            abort_if($reservation->training()->exists(), 422, 'Ce créneau est déjà réservé.');
+
+            $wallet = $trainingProposal->student
+                ->wallets()
+                ->where('offer_id', $attributes['offer_id'])
+                ->where('status', WalletTypeEnum::ACTIVE->value)
+                ->lockForUpdate()
+                ->first();
+
+            abort_unless($wallet, 422, 'Le forfait sélectionné n’est pas actif pour cet élève.');
+        }
+
         $trainingProposal->update([
-            'status' => $attributes['status'],
+            'status' => $status,
             'comment' => $attributes['comment'] ?? null,
         ]);
 
-        // Add your logic for creating proposition session here
-        // For example, if status is RESERVED, create a session
-        if ($attributes['status'] === 'reserved') { // Replace with your actual status value
-            $this->createPropositionSession($trainingProposal, $attributes);
+        if ($status === ProposalStatusEnum::RESERVER->value) {
+            $this->service->create([
+                'student_id' => $trainingProposal->student_id,
+                'offer_id' => $attributes['offer_id'],
+                'session_type' => 'Prestation',
+            ], $reservation);
+
+            // The chosen proposal is the reservation. Any offer made to a
+            // different student for that same availability is no longer valid.
+            TrainingProposal::query()
+                ->where('reservation_id', $reservation->id)
+                ->whereKeyNot($trainingProposal->id)
+                ->update(['status' => ProposalStatusEnum::CANCELLED->value]);
         }
 
         return $trainingProposal->fresh();

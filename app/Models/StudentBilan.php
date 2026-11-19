@@ -12,11 +12,14 @@ class StudentBilan extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['student_id', 'monitor_id', 'evaluations', 'hours'];
+    protected $fillable = ['student_id', 'monitor_id', 'evaluations', 'hours', 'shared_at', 'decision_status', 'decision_at', 'student_signature'];
 
     protected $casts = [
         'evaluations' => 'array',
         'hours' => 'array',
+        'shared_at' => 'datetime',
+        'decision_at' => 'datetime',
+        'student_signature' => 'array',
     ];
 
     public function student(): BelongsTo

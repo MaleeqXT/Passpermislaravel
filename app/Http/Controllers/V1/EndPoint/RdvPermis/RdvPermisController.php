@@ -18,26 +18,45 @@ class RdvPermisController extends Controller
 {
     use HandlesRdvPermisErrors;
 
-    public function status(Request $request, TokenService $tokens): JsonResponse
+    public function status(Request $request, TokenService $tokens, OAuthService $oauth): JsonResponse
     {
         try {
             $token = $tokens->forUser($request->user());
         } catch (Throwable $exception) {
             return $this->internalError($exception);
         }
+        $localOAuthUnavailable = $oauth->localCallbackConfigurationError() !== null;
+        $staleTokenCleared = $localOAuthUnavailable && $tokens->clearUnusableConnection($request->user());
+        if ($staleTokenCleared) {
+            $token = null;
+        }
+
         $status = $tokens->readiness($token);
         if ($status === 'connected' && $this->missingConfiguration() !== []) {
             $status = 'connection_unverified';
         }
 
+        $configured = $this->missingConfiguration() === [];
+        $message = $localOAuthUnavailable
+            ? 'La connexion OAuth RdvPermis doit être effectuée depuis l’environnement disposant du callback RECETTE autorisé.'
+            : null;
+        $authorizedEnvironmentUrl = $localOAuthUnavailable
+            ? rtrim((string) config('rdvpermis.frontend_callback_url'), '/').'/rdvpermis'
+            : null;
+
         return response()->json(['data' => [
             'environment' => config('rdvpermis.environment'),
-            'configured' => $this->missingConfiguration() === [],
+            'configured' => $configured,
+            'configurationComplete' => $configured,
             'missing_configuration' => $this->missingConfiguration(),
             'status' => $status,
             'connected' => $status === 'connected',
             'expires_at' => $token?->access_token_expires_at?->toIso8601String(),
-            'last_error' => $status === 'reconnect_required' ? 'La connexion RdvPermis doit être renouvelée.' : null,
+            'last_error' => $status === 'reconnect_required' && ! $localOAuthUnavailable ? 'La connexion RdvPermis doit être renouvelée.' : null,
+            'localOAuthUnavailable' => $localOAuthUnavailable,
+            'message' => $message,
+            'authorizedEnvironmentUrl' => $authorizedEnvironmentUrl,
+            'stale_token_cleared' => $staleTokenCleared,
         ]]);
     }
 
@@ -48,6 +67,10 @@ class RdvPermisController extends Controller
                 'message' => 'La configuration RdvPermis est incomplète.',
                 'missing_configuration' => $this->missingConfiguration(),
             ], 503);
+        }
+
+        if (($configurationError = $oauth->localCallbackConfigurationError()) !== null) {
+            return response()->json(['message' => $configurationError], 409);
         }
 
         try {

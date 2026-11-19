@@ -5,6 +5,7 @@ namespace App\Repository\V2\Student\Schedule\Training\Offre;
 use App\Models\Roles\Admin\Offer\Offer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Schema;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 
@@ -69,6 +70,9 @@ class FetchAllOffreRepo
             })
             ->when(isset($attributes['excluded_ids']), function (Builder $query) use ($attributes) {
                 self::applyExcludedIdsFilter($query, $attributes);
+            })
+            ->when(isset($attributes['evaluation_service']), function (Builder $query) use ($attributes) {
+                self::applyEvaluationServiceFilter($query, $attributes);
             })
             ->orderByDesc('order')
             ->paginate(min(max((int) ($attributes['per_page'] ?? 15), 1), 100));
@@ -238,5 +242,22 @@ class FetchAllOffreRepo
     private static function applyExcludedIdsFilter(Builder $query, array $attributes): void
     {
         $query->whereNotIn('id', $attributes['excluded_ids']);
+    }
+
+    /**
+     * Standalone pre-training service (conduite | bilan). Before the column
+     * exists, no offer can be one of these services, so return nothing rather
+     * than the whole catalogue.
+     */
+    private static function applyEvaluationServiceFilter(Builder $query, array $attributes): void
+    {
+        $service = (string) $attributes['evaluation_service'];
+        if (! in_array($service, Offer::EVALUATION_SERVICES, true) || ! Schema::hasColumn('offers', 'evaluation_service')) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where('evaluation_service', $service);
     }
 }

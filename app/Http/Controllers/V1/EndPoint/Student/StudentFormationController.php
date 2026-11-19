@@ -180,12 +180,21 @@ class StudentFormationController extends Controller
             'id' => (string) $reservation->id, 'number' => $number, 'date' => $date->format('Y-m-d'),
             'duration_minutes' => $duration, 'start_at' => $this->time($reservation->start_at),
             'monitor_name' => $reservation->monitor?->user?->name ?? '—',
-            'department' => $meta['department'] ?? $reservation->monitor?->details?->departement ?? '—',
+            // Same source as the monitor page: saved value, else the monitor's
+            // postal code, else the department of their profile.
+            'department' => trim((string) (($meta['department'] ?? '')
+                ?: $reservation->monitor?->user?->postal
+                ?: $reservation->monitor?->user?->postal_code_1
+                ?: $reservation->monitor?->details?->departement
+                ?: '')) ?: '—',
             'type' => $reservation->training?->session_type ?: 'Prestation', 'offer_name' => $reservation->training?->offer?->name ?? '—',
             'place_name' => $reservation->lieu?->name ?? '—',
             'boite_auto' => (bool) ($meta['boite_auto'] ?? $reservation->training?->offer?->is_auto ?? false),
             'evaluation_initiale' => $duration === 60 && (bool) ($data['evaluation_initiale'] ?? false),
             'evaluation_permis' => (bool) ($data['evaluation_permis'] ?? false),
+            // Read-only display data for the same layout as the monitor page.
+            'evaluation_permis_scores' => is_array($data['evaluation_permis_scores'] ?? null) ? $data['evaluation_permis_scores'] : [],
+            'maneuver_ratings' => is_array($meta['maneuver_ratings'] ?? null) ? $meta['maneuver_ratings'] : [],
             'public_observation' => $data['public_observations'] ?? '',
             'maneuvers' => array_values((array) ($data['manoeuvres'] ?? $data['maneuvers'] ?? [])),
             'maneuver_counts' => is_array($maneuverCounts) ? $maneuverCounts : [], 'has_schema' => is_array($meta['schema'] ?? null),

@@ -43,7 +43,10 @@ class Offer extends Model
     'order',
     'color',
     'is_evaluation',
+    'evaluation_service', // null | conduite | bilan
 ];
+
+    public const EVALUATION_SERVICES = ['conduite', 'bilan'];
 
     protected $casts = [
         'status' => 'boolean',

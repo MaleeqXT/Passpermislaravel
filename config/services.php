@@ -28,6 +28,12 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    'brevo' => [
+        'api_key' => env('BREVO_API_KEY'),
+        'sender_email' => env('BREVO_SENDER_EMAIL', env('MAIL_FROM_ADDRESS')),
+        'sender_name' => env('BREVO_SENDER_NAME', env('MAIL_FROM_NAME', 'PassPermis')),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
@@ -40,6 +46,13 @@ return [
     'piper' => [
         'binary' => env('PIPER_BINARY'),
         'french_model' => env('PIPER_FRENCH_MODEL', storage_path('app/tts/voices/fr_FR-siwis-medium.onnx')),
+    ],
+
+    'firebase' => [
+        'project_id' => env('FIREBASE_PROJECT_ID'),
+        // Absolute path to the private service-account JSON file. Never place
+        // this file in public/ or expose it through Vite variables.
+        'service_account_json' => env('FIREBASE_SERVICE_ACCOUNT_JSON'),
     ],
 
 ];

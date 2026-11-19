@@ -21,7 +21,6 @@ use App\Http\Controllers\V1\EndPoint\LivretNumerique\TrainingContractController;
 use App\Http\Controllers\V1\EndPoint\Student\Info\StudentStatsController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\CartController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\SaleDetailsController;
-use App\Http\Controllers\V1\EndPoint\Student\Sale\StudentPaymentSummaryController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\Type\PaypalController;
 use App\Http\Controllers\V1\EndPoint\Student\Sale\Type\StripController;
 use App\Http\Controllers\V1\EndPoint\Student\User\Wallet\WalletController;
@@ -33,6 +32,7 @@ use App\Http\Controllers\V1\EndPoint\System\Zone\ZoneController;
 use App\Http\Controllers\V1\Inertia\Admin\AdminCancellationController2;
 use App\Http\Controllers\V1\Inertia\CPF\CPFPagesController;
 use App\Http\Controllers\V1\Inertia\Student\User\UserController as StudentUserController;
+use App\Http\Controllers\V1\EndPoint\Admin\StudentAbsenceController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -190,6 +190,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::post('/students/{student}/required-documents', [StudentUserController::class, 'storeRequiredDocument'])
         ->name('students.required-documents.store');
     Route::middleware('role:admin|super-admin|secretary')->get('/admin/contacts', [ContactController::class, 'apiIndex']);
+    Route::middleware('role:admin|super-admin|secretary|monitor')->get('/admin/student-absences', [StudentAbsenceController::class, 'index']);
     Route::middleware('role:admin|super-admin|secretary')->prefix('approvels')->controller(AdminCancellationController2::class)->group(function () {
         Route::get('/', 'apiIndex');
         Route::post('/{cancellation}/approve', 'approve');
@@ -246,6 +247,4 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     // Student sales details (includes cart.cartDetails)
     Route::get('students/{student}/sales-with-details', [SaleDetailsController::class, 'index'])->name('students.sales.details');
-    Route::get('student/payment-summary', [StudentPaymentSummaryController::class, 'show'])->name('student.payment-summary');
-    Route::get('student/payments/{sale}/invoice', [StudentPaymentSummaryController::class, 'download'])->name('student.payment.invoice');
 });

@@ -167,6 +167,22 @@ class TokenService
         }
     }
 
+    /**
+     * Remove only a connection that cannot be used or renewed anymore. The
+     * caller is responsible for restricting this to the local environment.
+     */
+    public function clearUnusableConnection(User $user): bool
+    {
+        $token = $this->forUser($user);
+        if (! $token || ! $this->isUnusable($token)) {
+            return false;
+        }
+
+        return DB::table((new RdvPermisToken)->getTable())
+            ->where('user_id', $user->getKey())
+            ->delete() === 1;
+    }
+
     private function markExpired(RdvPermisToken $token): never
     {
         $token->update(['status' => 'reconnect_required', 'last_error' => 'OAuth session expired or refresh failed.']);
@@ -196,6 +212,24 @@ class TokenService
         }
 
         return 'reconnect_required';
+    }
+
+    private function isUnusable(RdvPermisToken $token): bool
+    {
+        if (in_array($token->status, ['reconnect_required', 'needs_reauthentication'], true)) {
+            return true;
+        }
+
+        if ($token->access_token_expires_at !== null && $token->access_token_expires_at->isFuture()) {
+            return false;
+        }
+
+        try {
+            return ! filled($token->refresh_token)
+                || ($token->refresh_expires_at !== null && $token->refresh_expires_at->isPast());
+        } catch (DecryptException) {
+            return true;
+        }
     }
 
     private function tokenAttributes(array $payload, ?RdvPermisToken $existingToken = null): array

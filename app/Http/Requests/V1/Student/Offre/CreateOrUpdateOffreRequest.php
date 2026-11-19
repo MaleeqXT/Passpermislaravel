@@ -48,6 +48,8 @@ class CreateOrUpdateOffreRequest extends FormRequest
             'type_offre' => ['required', new Enum(OffreTypeEnum::class)],
             'color' => 'required | max:255',
             'is_evaluation' => 'nullable | boolean',
+            // Standalone pre-training service: Évaluation de conduite or Bilan.
+            'evaluation_service' => ['nullable', 'string', 'in:conduite,bilan'],
             'order' => 'nullable | integer',
         ];
     }
@@ -88,6 +90,7 @@ class CreateOrUpdateOffreRequest extends FormRequest
             'type_offre.string' => 'Le type d\'offre doit être une chaîne de caractères.',
             'color.max' => 'La couleur ne doit pas dépasser 255 caractères.',
             'is_evaluation.boolean' => 'L\'évaluation doit être un booléen.',
+            'evaluation_service.in' => 'Le service d\'évaluation doit être « Évaluation de conduite » ou « Bilan ».',
             'status.boolean' => 'Le statut doit être un booléen.',
             'media.file' => 'Le média doit être un fichier.',
             'media.image' => 'Le média doit être une image.',

@@ -51,6 +51,8 @@ class Student extends Model
         'registration_confirmation_sent_at' => 'datetime',
         'required_documents' => 'array',
         'communication_preferences' => 'array',
+        'weekly_availability' => 'array',
+        'notification_preferences' => 'array',
     ];
 
     //  protected $with = ['training.reservation.reviewMonitor'];

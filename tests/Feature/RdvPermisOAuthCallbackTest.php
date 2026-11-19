@@ -49,4 +49,5 @@ class RdvPermisOAuthCallbackTest extends TestCase
         $response->assertRedirect('https://reactfast.passpermisfacile.fr/?rdvpermis=error');
         $this->assertStringNotContainsString('one-time-code', $response->getContent());
     }
+
 }

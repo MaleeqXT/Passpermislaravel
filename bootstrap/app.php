@@ -19,6 +19,8 @@ $app = Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'slow' => \App\Http\Middleware\SimulateSlowResponse::class,
+            'student-portal-auth' => \App\Http\Middleware\AuthenticateStudentPortal::class,
+            'prefer-bearer-token' => \App\Http\Middleware\PreferBearerTokenAuthentication::class,
             'verified-or-student-preview' => \App\Http\Middleware\EnsureEmailIsVerifiedOrStudentPreview::class,
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,

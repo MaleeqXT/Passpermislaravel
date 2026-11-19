@@ -6,6 +6,7 @@ use App\Enums\V2\Admin\Popular\SituationStatusEnum;
 use App\Enums\V2\Student\Examen\ExamenResultPermisEnum;
 use App\Enums\V2\Student\Examen\ExamenStatusEnum;
 use App\Http\Controllers\Controller;
+use App\Models\MonitorExamReadiness;
 use App\Models\Roles\Admin\Area\Lieu;
 use App\Models\Roles\Monitor\User\Monitor;
 use App\Models\Roles\Student\Exam\StudentExam;
@@ -24,6 +25,10 @@ class AdminExamController extends Controller
 
         return response()->json([
             'data' => $students->map(fn (Student $student) => $this->serializeStudent($student))->values(),
+            // A monitor declares readiness from the candidate's Formation
+            // page. Staff can then see that declaration here before creating
+            // the official StudentExam appointment.
+            'ready_students' => $this->readyStudents($zoneId),
             'filters' => [
                 'monitors' => $this->monitorOptions($zoneId),
                 'locations' => $this->locationOptions($zoneId),
@@ -152,6 +157,43 @@ class AdminExamController extends Controller
             ->orderBy('name')
             ->pluck('name')
             ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Read-only staff view of candidates whose linked monitor marked them as
+     * ready. This intentionally does not create an exam booking: scheduling
+     * remains the responsibility of the existing administration workflow.
+     */
+    private function readyStudents(?string $zoneId): array
+    {
+        return MonitorExamReadiness::query()
+            ->with([
+                'student.user:id,name,first_name,last_name,phone,zone_id',
+                'monitor.user:id,name,first_name,last_name',
+            ])
+            ->where('is_ready', true)
+            ->whereHas('student.user', fn ($query) => $query->where('status', SituationStatusEnum::ACTIVE->value))
+            ->when($zoneId, fn ($query) => $query->whereHas('student.user', fn ($user) => $user->where('zone_id', $zoneId)))
+            ->orderByDesc('ready_at')
+            ->get()
+            ->map(function (MonitorExamReadiness $readiness) {
+                $student = $readiness->student;
+                $user = $student?->user;
+
+                return [
+                    'id' => $readiness->id,
+                    'student_id' => $student?->id,
+                    'candidate' => $this->personName($user) ?: 'Élève',
+                    'phone' => $user?->phone ?: '',
+                    'monitor' => $this->personName($readiness->monitor?->user) ?: '—',
+                    'ready_at' => $readiness->ready_at?->toIso8601String(),
+                    'additional_hours' => $readiness->additional_hours,
+                    'practice_frequency' => $readiness->practice_frequency ?: '—',
+                    'observation' => $readiness->observation ?: '',
+                ];
+            })
             ->values()
             ->all();
     }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\V1\EndPoint\Bilan\BilanController;
+use App\Http\Controllers\V1\EndPoint\Monitor\ExamReadyStudentController;
 use App\Http\Controllers\V1\EndPoint\Monitor\FormationController;
 use App\Http\Controllers\V1\EndPoint\Monitor\Invoice\InvoiceController;
 use App\Http\Controllers\V1\EndPoint\Monitor\Rating\RatingMonitorController;
@@ -127,6 +128,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::delete('/{reservation}', 'destroy')->name('destroy');
         Route::post('/{reservation}/sign', 'sign')->name('sign');
     });
+
+    Route::prefix('exam-ready')->name('exam-ready.')
+        ->controller(ExamReadyStudentController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/candidates', 'candidates')->name('candidates');
+            Route::post('/', 'store')->name('store');
+            Route::put('/{student}', 'update')->name('update');
+            Route::delete('/{student}', 'destroy')->name('destroy');
+        });
 
     Route::prefix('bilans')->name('bilans.')
         ->controller(BilanController::class)->group(function () {

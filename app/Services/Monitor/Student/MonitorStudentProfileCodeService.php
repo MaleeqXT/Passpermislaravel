@@ -6,6 +6,7 @@ use App\Models\Roles\Monitor\Schedule\Reservation;
 use App\Models\Roles\Monitor\User\Monitor;
 use App\Models\Roles\Student\User\Student;
 use App\Services\Student\Exam\StudentExamInformationService;
+use Carbon\Carbon;
 
 /**
  * Supplies only the colour-coding facts required by a monitor's student
@@ -42,6 +43,27 @@ class MonitorStudentProfileCodeService
                     ? 'neutral'
                     : ($presentationNumber === 1 ? 'light' : 'dark'),
             ],
+            // Identity facts shown in the drawer's "Informations personnelles".
+            'student' => $this->codeInformation($student),
+        ];
+    }
+
+    /** NEPH and theory-test (code) validity of the student. */
+    private function codeInformation(Student $student): array
+    {
+        $validUntil = null;
+        if ($student->date_expiration_code) {
+            $validUntil = Carbon::parse($student->date_expiration_code);
+        } elseif ($student->date_code) {
+            // The code result is valid for 5 years from the date it was obtained.
+            $validUntil = Carbon::parse($student->date_code)->addYears(5);
+        }
+
+        return [
+            'neph' => $student->neph ?: null,
+            'date_code' => $student->date_code ? Carbon::parse($student->date_code)->toDateString() : null,
+            'code_valid_until' => $validUntil?->toDateString(),
+            'code_expired' => $validUntil ? $validUntil->endOfDay()->isPast() : null,
         ];
     }
 

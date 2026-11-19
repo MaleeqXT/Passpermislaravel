@@ -72,6 +72,23 @@ class RdvPermisOAuthConfigurationTest extends TestCase
         $this->assertDatabaseMissing('rdvpermis_oauth_states', ['state_hash' => $query['state']]);
     }
 
+    public function test_it_detects_a_local_callback_that_points_to_another_deployment_before_state_creation(): void
+    {
+        config()->set('app.url', 'http://localhost');
+        config()->set('rdvpermis.redirect_uri', 'https://staging.example.test/api/rdvpermis/callback');
+
+        $this->assertStringContainsString('callback OAuth', app(OAuthService::class)->localCallbackConfigurationError());
+        $this->assertDatabaseCount('rdvpermis_oauth_states', 0);
+    }
+
+    public function test_a_registered_local_callback_is_not_blocked_by_the_local_preflight(): void
+    {
+        config()->set('app.url', 'http://localhost');
+        config()->set('rdvpermis.redirect_uri', 'https://localhost:8443/api/rdvpermis/callback');
+
+        $this->assertNull(app(OAuthService::class)->localCallbackConfigurationError());
+    }
+
     public function test_it_rejects_an_unknown_or_already_consumed_state(): void
     {
         $this->expectException(RuntimeException::class);

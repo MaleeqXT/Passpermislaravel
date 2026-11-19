@@ -58,14 +58,16 @@ class StudentProgressController extends Controller
                     ->values()
                     ->map(function ($competency, int $questionIndex) use ($mainIndex, $ratingsByCompetency) {
                         $rating = $ratingsByCompetency->get($competency->id);
-                        $level = min(5, max(0, (int) ($rating?->rating ?? 0)));
+                        // Keep the student booklet on the same three-level
+                        // scale as the monitor evaluation screen.
+                        $level = min(3, max(0, (int) ($rating?->rating ?? 0)));
 
                         return [
                             'id' => (string) $competency->id,
                             'letter' => ($mainIndex + 1) . '.' . ($questionIndex + 1),
                             'title' => $competency->label,
                             'level' => $level,
-                            'status' => $level >= 5 ? 'acquired' : ($level > 0 ? 'in_progress' : 'neutral'),
+                            'status' => $level >= 3 ? 'acquired' : ($level === 2 ? 'in_progress' : ($level === 1 ? 'failed' : 'neutral')),
                             'observations' => $rating?->comment ?? '',
                             'studentResponse' => $rating?->evaluationDetail?->student_response ?? '',
                             'studentEvaluation' => $rating?->evaluationDetail?->student_evaluation ?? false,
@@ -79,7 +81,7 @@ class StudentProgressController extends Controller
                     'id' => strtolower($mainCompetency->label),
                     'code' => $mainCompetency->label,
                     'title' => $mainCompetency->name,
-                    'progress' => $total ? (int) round(($questions->sum('level') / ($total * 5)) * 100) : 0,
+                    'progress' => $total ? (int) round(($questions->sum('level') / ($total * 3)) * 100) : 0,
                     'questions' => $questions->all(),
                 ];
             });
@@ -100,7 +102,7 @@ class StudentProgressController extends Controller
                 'id' => $student->id,
                 'name' => $student->user?->name ?? '',
             ],
-            'overallPercentage' => $totalQuestions ? (int) round(($levelTotal / ($totalQuestions * 5)) * 100) : 0,
+            'overallPercentage' => $totalQuestions ? (int) round(($levelTotal / ($totalQuestions * 3)) * 100) : 0,
             'competencies' => $competencies->all(),
             'maneuverCounts' => $this->maneuverCounts($reservations),
             'hours' => [

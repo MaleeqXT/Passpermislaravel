@@ -42,6 +42,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::prefix('proposals')->name('proposals.')
         ->controller(AdminProposalTrainingController::class)->group(function () {
             Route::get('/', 'proposals')->name('index');
+            Route::post('/{trainingProposal}', 'update')->name('update');
         });
     Route::prefix('reservations')->name('reservations.')
         ->controller(ReservationAdminController::class)->group(function () {

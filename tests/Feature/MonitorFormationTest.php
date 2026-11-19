@@ -18,6 +18,7 @@ use App\Services\Monitor\Student\MonitorStudentHoursService;
 use App\Services\SatisfactionOfferTriggerService;
 use App\Services\Student\Training\info\TrainingInterface;
 use App\Services\Student\Training\Reservation\info\ReservationInterface;
+use App\Repository\V2\Student\Account\V3\Competency\FetchMainCompetencyRepo as AdminCompetencyBooklet;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,8 @@ class MonitorFormationTest extends TestCase
             'reservations' => 'id TEXT PRIMARY KEY, monitor_id TEXT, lieu_id TEXT, date TEXT, start_at TEXT, end_at TEXT, hour INTEGER, duration_minutes INTEGER, is_active INTEGER, deleted_at TEXT, created_at TEXT, updated_at TEXT',
             'trainings' => 'id TEXT PRIMARY KEY, reservation_id TEXT, student_id TEXT, offer_id TEXT, session_type TEXT, prestation TEXT, deleted_at TEXT, created_at TEXT, updated_at TEXT',
             'training_proposals' => 'id TEXT PRIMARY KEY, reservation_id TEXT, status INTEGER, deleted_at TEXT, created_at TEXT, updated_at TEXT',
-            'review_monitors' => 'id TEXT PRIMARY KEY, reservation_id TEXT, monitor_id TEXT, is_absent INTEGER, comment TEXT, estimation REAL, created_at TEXT, updated_at TEXT',
+            // Mirrors the production table, which has no monitor_id column.
+            'review_monitors' => 'id TEXT PRIMARY KEY, reservation_id TEXT, is_absent INTEGER, comment TEXT, estimation REAL, created_at TEXT, updated_at TEXT',
             'document_evaluations' => 'id TEXT PRIMARY KEY, reservation_id TEXT, student_id TEXT, monitor_id TEXT, data TEXT, created_at TEXT, updated_at TEXT',
             'maneuver_catalogs' => 'id TEXT PRIMARY KEY, slug TEXT, name TEXT, group_name TEXT, icon TEXT, sort_order INTEGER, is_active INTEGER, created_at TEXT, updated_at TEXT',
             'maneuver_occurrences' => 'id TEXT PRIMARY KEY, maneuver_id TEXT, maneuver_slug TEXT, maneuver_name TEXT, reservation_id TEXT, student_id TEXT, monitor_id TEXT, occurred_on TEXT, sequence INTEGER, rating INTEGER, created_at TEXT, updated_at TEXT',
@@ -657,14 +659,44 @@ class MonitorFormationTest extends TestCase
         DB::table('main_competencies')->insert(['id' => $group, 'label' => 'C1', 'name' => 'Database competency group', 'status' => 1, 'position' => 1]);
         DB::table('competencies')->insert(['id' => $skill, 'main_competency_id' => $group, 'label' => 'Existing database skill', 'status' => 1, 'position' => 1]);
         $past = Reservation::first();
-        $this->putJson('/api/monitor/progress/'.$this->student->id.'/competencies/'.$skill, [
-            'rating' => 4, 'observations' => 'Instructor skill observation', 'reservation_id' => $past->id,
+        $response = $this->putJson('/api/monitor/progress/'.$this->student->id.'/competencies/'.$skill, [
+            'rating' => 3, 'observations' => 'Instructor skill observation', 'reservation_id' => $past->id,
             'student_evaluation' => true, 'student_response' => 'Retained student response', 'active_tab' => 'comment',
-        ])->assertOk();
+        ])->assertOk()
+            ->assertJsonPath('data.competencies.0.questions.0.level', 3)
+            ->assertJsonPath('data.competencies.0.questions.0.status', 'acquired')
+            ->assertJsonPath('data.competencies.0.progress', 100);
         $this->getJson('/api/monitor/formation/'.$this->student->id)->assertOk()
-            ->assertJsonPath('data.lessons.0.competencies.0.rating', 4)
+            ->assertJsonPath('data.lessons.0.competencies.0.rating', 3)
             ->assertJsonPath('data.lessons.0.competencies.0.studentResponse', 'Retained student response');
         $this->assertSame($past->id, DB::table('ratings')->value('reservation_id'));
+    }
+
+    public function test_admin_booklet_shows_the_latest_monitor_rating_for_the_four_remc_series(): void
+    {
+        DB::statement('CREATE TABLE main_competencies (id TEXT PRIMARY KEY, label TEXT, name TEXT, status INTEGER, position INTEGER, created_at TEXT, updated_at TEXT)');
+        $c1 = (string) Str::uuid();
+        $legacy = (string) Str::uuid();
+        $skill = (string) Str::uuid();
+
+        DB::table('main_competencies')->insert([
+            ['id' => $c1, 'label' => 'C1', 'name' => 'REMC C1', 'status' => 1, 'position' => 1],
+            ['id' => $legacy, 'label' => 'C5', 'name' => 'Legacy group', 'status' => 1, 'position' => 5],
+        ]);
+        DB::table('competencies')->insert([
+            'id' => $skill, 'main_competency_id' => $c1, 'label' => 'Question C1', 'status' => 1, 'position' => 1,
+        ]);
+        DB::table('ratings')->insert([
+            ['id' => (string) Str::uuid(), 'competency_id' => $skill, 'student_id' => $this->student->id, 'monitor_id' => $this->monitor->id, 'rating' => 2, 'comment' => 'Ancienne évaluation', 'updated_at' => '2026-10-01 09:00:00'],
+            ['id' => (string) Str::uuid(), 'competency_id' => $skill, 'student_id' => $this->student->id, 'monitor_id' => $this->monitor->id, 'rating' => 5, 'comment' => 'Évaluation monitor la plus récente', 'updated_at' => '2026-10-02 09:00:00'],
+        ]);
+
+        $booklet = AdminCompetencyBooklet::run($this->student);
+
+        $this->assertCount(1, $booklet);
+        $this->assertSame('C1', $booklet->first()->label);
+        $this->assertSame(5, $booklet->first()->competencies->first()->rating->rating);
+        $this->assertSame('Évaluation monitor la plus récente', $booklet->first()->competencies->first()->rating->comment);
     }
 
     public function test_public_observations_and_maneuvers_are_visible_to_the_student_without_private_teacher_notes(): void

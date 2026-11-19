@@ -80,6 +80,27 @@ class ChatContacts
         return $this->query($user)->whereKey($contactUserId)->exists();
     }
 
+    /**
+     * A monitor must be able to follow up with a student they actually taught,
+     * even after the final reservation. This is deliberately narrower than the
+     * contact picker: it applies only to an existing private conversation and
+     * only where a reservation links that monitor to that student.
+     */
+    public function allowsHistoricalStudentConversation(User $monitorUser, int $studentUserId): bool
+    {
+        if (! $monitorUser->hasRole('monitor') || ! $monitorUser->monitor) {
+            return false;
+        }
+
+        return User::query()
+            ->whereKey($studentUserId)
+            ->whereHas('roles', fn (Builder $roles) => $roles->where('name', 'student'))
+            ->whereHas('student.trainings.reservation', fn (Builder $reservation) =>
+                $reservation->where('monitor_id', $monitorUser->monitor->id)
+            )
+            ->exists();
+    }
+
     public static function summary(User $user): array
     {
         // `media` is also a legacy relationship name, so read the actual users.media

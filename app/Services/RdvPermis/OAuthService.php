@@ -16,6 +16,23 @@ class OAuthService
 {
     public function __construct(private readonly TokenService $tokens) {}
 
+    /**
+     * A local Laravel process cannot consume an authorization callback sent to
+     * a remote deployment. This detects that split before a state row is
+     * created and before the browser is sent to the provider.
+     */
+    public function localCallbackConfigurationError(): ?string
+    {
+        $applicationHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+        $callbackHost = parse_url((string) config('rdvpermis.redirect_uri'), PHP_URL_HOST);
+
+        if (! $this->isLoopbackHost($applicationHost) || $this->isLoopbackHost($callbackHost)) {
+            return null;
+        }
+
+        return 'La connexion RdvPermis locale ne peut pas être finalisée : le callback OAuth est configuré vers un autre déploiement. Utilisez un callback localhost/HTTPS enregistré pour cette base locale, ou connectez-vous depuis le déploiement qui possède ce callback.';
+    }
+
     public function authorizationUrl(User $user): string
     {
         $this->requireConfiguration(['authorization_url', 'client_id', 'redirect_uri']);
@@ -264,6 +281,11 @@ class OAuthService
     private function stateTtlMinutes(): int
     {
         return max(1, (int) config('rdvpermis.state_ttl_minutes', 10));
+    }
+
+    private function isLoopbackHost(?string $host): bool
+    {
+        return in_array(strtolower((string) $host), ['localhost', '127.0.0.1', '::1'], true);
     }
 
     private function logStateFailure(

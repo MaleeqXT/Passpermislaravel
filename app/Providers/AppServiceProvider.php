@@ -17,6 +17,7 @@ use App\Services\Student\Training\Reservation\info\ReservationService;
 use App\Services\Student\Training\Reservation\info\UnrestrictedReservationService;
 use App\Services\Student\Training\Reservation\params\ReservationPramsInterface;
 use App\Services\Student\Training\Reservation\params\ReservationPramsService;
+use App\Services\Mail\BrevoTransactionalMailService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -26,7 +27,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // The Brevo client is created lazily by this service so no credentials
+        // or HTTP connections are accessed while regular chat requests boot.
+        $this->app->scoped(BrevoTransactionalMailService::class, fn () => new BrevoTransactionalMailService());
     }
 
     /**
