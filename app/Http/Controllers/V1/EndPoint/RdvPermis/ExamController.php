@@ -106,6 +106,11 @@ class ExamController extends Controller
         return $this->respond(fn () => $exams->permute($request->user(), $validated['examenId1'], $validated['examenId2']));
     }
 
+    public function registerCandidate(Request $request, string $examenId, string $candidatId, ExamService $exams): JsonResponse
+    {
+        return $this->respond(fn () => $exams->registerCandidate($request->user(), $examenId, $candidatId));
+    }
+
     /** @param callable(): ClientResponse $operation */
     private function respond(callable $operation): JsonResponse
     {

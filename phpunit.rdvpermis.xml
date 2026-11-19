@@ -9,6 +9,7 @@
             <file>tests/Feature/RdvPermisEligibilityAndErrorsTest.php</file>
             <file>tests/Feature/RdvPermisExamApiTest.php</file>
             <file>tests/Feature/RdvPermisFreshMigrationTest.php</file>
+            <file>tests/Feature/RdvPermisHeavyVehicleCandidateApiTest.php</file>
             <file>tests/Feature/RdvPermisImportAccessTokenCommandTest.php</file>
             <file>tests/Feature/RdvPermisOAuthCallbackTest.php</file>
             <file>tests/Feature/RdvPermisPanierApiTest.php</file>
@@ -18,6 +19,7 @@
             <file>tests/Feature/RdvPermisRefreshSafetyTest.php</file>
             <file>tests/Feature/RdvPermisStudentMandateTest.php</file>
             <file>tests/Feature/RdvPermisTokenPersistenceRecoveryTest.php</file>
+            <file>tests/Feature/RdvPermisTrainerThresholdAndExamRegistrationTest.php</file>
             <file>tests/Unit/RdvPermisApiClientTest.php</file>
             <file>tests/Unit/RdvPermisAutoEcoleServiceTest.php</file>
             <file>tests/Unit/RdvPermisOAuthConfigurationTest.php</file>

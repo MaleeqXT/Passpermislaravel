@@ -18,6 +18,19 @@ class StudentMandateService
     ) {}
 
     /**
+     * Mapping layer between local columns and the Swagger body CreerMandatApi
+     * (POST /api/v2/auto-ecole/mandats, see docs/rdvpermis-api-contract.md):
+     *
+     *   users.last_name  -> nom            (surname only, never first or full name)
+     *   students.neph    -> numeroDossier  (string, format kept as stored)
+     *   users.email      -> email          (required locally; provider requires it
+     *                                       when the candidate has no RdvPermis account)
+     *   permit group     -> groupePermis   (A|B; there is no local permit column,
+     *                                       PassPermis handles category B)
+     *
+     * Only whitespace is normalised. No other local field is ever sent
+     * (students.id, first_name, name, boite_type, …).
+     *
      * @return array{nom:string, numeroDossier:string, email:string, groupePermis:string}
      */
     public function payloadFor(Student $student): array
@@ -25,32 +38,40 @@ class StudentMandateService
         $student->loadMissing('user');
         $user = $student->user;
 
-        if (! $user || ! filled($user->last_name)) {
+        $nom = $this->normalizeWhitespace($user?->last_name);
+        $numeroDossier = $this->normalizeWhitespace($student->neph);
+        $email = trim((string) $user?->email);
+
+        if ($nom === '') {
             throw new InvalidArgumentException('Le nom du candidat est requis avant la synchronisation RdvPermis.');
         }
 
-        if (! filled($student->neph)) {
+        if ($numeroDossier === '') {
             throw new InvalidArgumentException('Le numéro de dossier NEPH est requis avant la synchronisation RdvPermis.');
         }
 
-        if (! filled($user->email)) {
+        if ($email === '') {
             throw new InvalidArgumentException('Une adresse e-mail est requise avant la synchronisation RdvPermis.');
         }
 
-        if (! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Une adresse e-mail valide est requise avant la synchronisation RdvPermis.');
         }
 
-        $payload = [
-            'nom' => trim((string) $user->last_name),
+        return [
+            'nom' => $nom,
             // Do not convert to an integer: the government contract requires a string.
-            'numeroDossier' => (string) $student->neph,
-            'email' => trim((string) $user->email),
-            // PassPermis currently handles category-B candidates. Transmission
-            // type (students.boite_type) is intentionally unrelated here.
+            'numeroDossier' => $numeroDossier,
+            'email' => $email,
+            // Transmission type (students.boite_type) is intentionally unrelated here.
             'groupePermis' => self::GROUPE_PERMIS,
         ];
-        return $payload;
+    }
+
+    /** Trims and collapses runs of whitespace; never changes other characters. */
+    private function normalizeWhitespace(mixed $value): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', (string) ($value ?? '')));
     }
 
     public function synchronize(User $actor, Student $student): Response

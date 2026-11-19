@@ -92,6 +92,94 @@ class RdvPermisStudentMandateTest extends TestCase
         $this->assertStringNotContainsString('imported-swagger-token', $response->getContent());
     }
 
+    public function test_lucie_simon_sends_surname_only_neph_email_and_group_b(): void
+    {
+        $actor = $this->signIn('admin');
+        $this->seedStudent('8710857 7602', 'SIMON', 'simon.lucie.83@exemple.fr', 'LUCIE', boiteType: 1);
+        $this->bindValidToken($actor);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response(['id' => 'mandate-lucie'], 201)]);
+
+        // Local-only fields in the request must be ignored.
+        $this->postJson(self::ROUTE, [
+            'nom' => 'LUCIE SIMON', 'numeroDossier' => self::STUDENT_ID, 'groupePermis' => '1', 'first_name' => 'LUCIE',
+        ])->assertCreated();
+
+        Http::assertSentCount(1);
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return $data === [
+                'nom' => 'SIMON',
+                'numeroDossier' => '8710857 7602',
+                'email' => 'simon.lucie.83@exemple.fr',
+                'groupePermis' => 'B',
+            ]
+                && $data['nom'] !== 'LUCIE SIMON'
+                && ! str_contains($data['nom'], 'LUCIE')
+                && $data['numeroDossier'] !== self::STUDENT_ID;
+        });
+    }
+
+    public function test_only_whitespace_is_normalised_in_the_provider_payload(): void
+    {
+        $actor = $this->signIn('admin');
+        $this->seedStudent("  8710857   7602 ", '  SIMON ', ' simon.lucie.83@exemple.fr ', 'LUCIE');
+        $this->bindValidToken($actor);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response(['id' => 'mandate-lucie'], 201)]);
+
+        $this->postJson(self::ROUTE, [])->assertCreated();
+
+        Http::assertSent(fn ($request) => $request->data() === [
+            'nom' => 'SIMON',
+            'numeroDossier' => '8710857 7602',
+            'email' => 'simon.lucie.83@exemple.fr',
+            'groupePermis' => 'B',
+        ]);
+    }
+
+    public function test_local_preview_returns_exactly_the_payload_that_is_sent(): void
+    {
+        $actor = $this->signIn('admin');
+        $this->seedStudent('8710857 7602', 'SIMON', 'simon.lucie.83@exemple.fr', 'LUCIE', boiteType: 1);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/mandats' => Http::response(['id' => 'mandate-lucie'], 201)]);
+
+        $preview = $this->getJson(self::ROUTE.'/preview')->assertOk()->json('payload');
+        $this->assertSame([
+            'nom' => 'SIMON',
+            'numeroDossier' => '8710857 7602',
+            'email' => 'simon.lucie.83@exemple.fr',
+            'groupePermis' => 'B',
+        ], $preview);
+        Http::assertNothingSent();
+        $this->assertSame(0, RdvPermisSyncRecord::count());
+
+        $this->bindValidToken($actor);
+        $this->postJson(self::ROUTE, [])->assertCreated();
+        Http::assertSent(fn ($request) => $request->data() === $preview);
+    }
+
+    public function test_local_preview_reports_missing_values_without_calling_the_provider(): void
+    {
+        $this->signIn('admin');
+        $this->seedStudent(null, 'SIMON', 'simon.lucie.83@exemple.fr', 'LUCIE');
+        Http::fake();
+
+        $this->getJson(self::ROUTE.'/preview')->assertUnprocessable()
+            ->assertExactJson(['message' => 'Le numéro de dossier NEPH est requis avant la synchronisation RdvPermis.']);
+        Http::assertNothingSent();
+    }
+
+    public function test_payload_preview_does_not_exist_in_production(): void
+    {
+        $this->app['env'] = 'production';
+        $this->signIn('admin');
+        $this->seedStudent('8710857 7602', 'SIMON', 'simon.lucie.83@exemple.fr', 'LUCIE');
+        Http::fake();
+
+        $this->getJson(self::ROUTE.'/preview')->assertNotFound();
+        Http::assertNothingSent();
+    }
+
     public function test_it_uses_category_b_without_a_request_body_or_transmission_mapping(): void
     {
         $actor = $this->signIn('admin');
@@ -308,17 +396,22 @@ class RdvPermisStudentMandateTest extends TestCase
         $this->assertSame('failed', RdvPermisSyncRecord::query()->sole()->status);
     }
 
-    private function seedStudent(?string $neph, ?string $lastName = 'Dupont', ?string $email = 'louis.dupont@example.test'): void
-    {
+    private function seedStudent(
+        ?string $neph,
+        ?string $lastName = 'Dupont',
+        ?string $email = 'louis.dupont@example.test',
+        string $firstName = 'Louis',
+        ?int $boiteType = null,
+    ): void {
         DB::table('users')->insert([
-            'id' => 1, 'first_name' => 'Louis', 'last_name' => $lastName ?? '',
-            'name' => trim('Louis '.($lastName ?? '')), 'email' => $email ?? '', 'password' => 'fixture',
+            'id' => 1, 'first_name' => $firstName, 'last_name' => $lastName ?? '',
+            'name' => trim($firstName.' '.($lastName ?? '')), 'email' => $email ?? '', 'password' => 'fixture',
             'created_at' => now(), 'updated_at' => now(),
         ]);
         DB::table('students')->insert([
             'id' => self::STUDENT_ID, 'user_id' => 1, 'neph' => $neph,
             'created_at' => now(), 'updated_at' => now(),
-        ]);
+        ] + ($boiteType === null ? [] : ['boite_type' => $boiteType]));
     }
 
     private function signIn(string $role): User

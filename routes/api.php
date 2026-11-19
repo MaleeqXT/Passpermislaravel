@@ -112,6 +112,7 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary'])->prefix(
     Route::get('/current-school', [RdvPermisController::class, 'currentSchool'])->name('current-school');
     Route::get('/employees', [RdvPermisController::class, 'employees'])->name('employees');
     Route::get('/trainer-assignments', [RdvPermisController::class, 'trainerAssignments'])->name('trainer-assignments');
+    Route::get('/seuil-formateur', [RdvPermisController::class, 'trainerThreshold'])->name('trainer-threshold');
     Route::post('/planning/recherche', [PlanningController::class, 'search'])->name('planning.search');
     Route::post('/candidats/recherche', [CandidateEligibilityController::class, 'search'])->name('candidates.eligibility');
     Route::post('/candidats-groupe-lourd/recherche', [HeavyVehicleCandidateController::class, 'search'])->name('candidates.heavy-vehicle');
@@ -128,6 +129,7 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary'])->prefix(
         Route::get('/nombre-de-remplacement', 'replacementAllowance')->name('replacement-allowance');
         Route::get('/dates', 'dates')->name('dates');
         Route::get('/pagines', 'paginated')->name('paginated');
+        Route::put('/{examenId}/candidat/{candidatId}/validation', 'registerCandidate')->name('candidate.register');
         Route::get('/{examenId}', 'show')->name('show');
         Route::delete('/{examenId}', 'destroy')->name('destroy');
     });

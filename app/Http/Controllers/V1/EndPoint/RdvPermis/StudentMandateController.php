@@ -14,6 +14,24 @@ class StudentMandateController extends Controller
 {
     use HandlesRdvPermisErrors;
 
+    /**
+     * Local-development preview of the exact body store() would send. It calls
+     * no provider endpoint and needs no token. It does not exist outside the
+     * local and testing environments.
+     */
+    public function preview(Student $student, StudentMandateService $mandates): JsonResponse
+    {
+        if (! app()->environment(['local', 'testing'])) {
+            abort(404);
+        }
+
+        try {
+            return response()->json(['payload' => $mandates->payloadFor($student)]);
+        } catch (InvalidArgumentException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+    }
+
     public function store(Request $request, Student $student, StudentMandateService $mandates): JsonResponse
     {
         try {

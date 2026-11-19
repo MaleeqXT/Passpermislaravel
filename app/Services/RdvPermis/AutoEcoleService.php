@@ -22,6 +22,8 @@ class AutoEcoleService
 
     private const TRAINER_ASSIGNMENTS_PATH = '/api/v2/auto-ecole/affectations-formateurs';
 
+    private const TRAINER_THRESHOLD_PATH = '/api/v2/auto-ecole/informations-seuil-departement';
+
     public function __construct(private readonly ApiClient $client) {}
 
     public function currentSchool(User $user): Response
@@ -41,6 +43,20 @@ class AutoEcoleService
     public function trainerAssignments(User $user): Response
     {
         return $this->client->get($user, self::TRAINER_ASSIGNMENTS_PATH);
+    }
+
+    /**
+     * Trainer threshold (seuil formateur) for one month, department and licence
+     * group. Swagger (RECETTE, 2026-11-19): all three query parameters are
+     * required and groupe-permis only accepts A or B.
+     */
+    public function trainerThreshold(User $user, string $date, string $codeDepartement, string $groupePermis): Response
+    {
+        return $this->client->get($user, self::TRAINER_THRESHOLD_PATH, [
+            'date' => $date,
+            'code-departement' => $codeDepartement,
+            'groupe-permis' => $groupePermis,
+        ]);
     }
 
     /**

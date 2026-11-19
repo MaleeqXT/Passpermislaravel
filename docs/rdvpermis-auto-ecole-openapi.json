@@ -1,0 +1,4794 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "permisdeconduire.gouv.fr : API RdvPermis pour auto-écoles",
+    "description": "Ces routes d'API permettent l'utilisation de RdvPermis par les auto-écoles. Il est nécessaire d'avoir le scope `rdvpermis` pour pouvoir utiliser la plupart d'entre elles.",
+    "version": "v0.0.2"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Formateur",
+      "description": "Routes API des formateurs"
+    },
+    {
+      "name": "Employé Auto-École",
+      "description": "Routes API de l'employé auto-école"
+    },
+    {
+      "name": "Examen",
+      "description": "Routes API des examens"
+    },
+    {
+      "name": "Nouveau Panier",
+      "description": "Routes API du panier de réservation de créneaux"
+    },
+    {
+      "name": "Simulateur",
+      "description": "Routes API liées aux simulateurs"
+    },
+    {
+      "name": "Centre",
+      "description": "Routes API des centres d'examens"
+    },
+    {
+      "name": "Examen",
+      "description": "Nombre de remplacements effectués par une auto-école"
+    },
+    {
+      "name": "Employé Auto-École",
+      "description": "Routes API des employés d'auto-école"
+    },
+    {
+      "name": "Panier",
+      "description": "Anciennes routes du panier - Dépréciées"
+    },
+    {
+      "name": "Auto-École",
+      "description": "Routes API de l'auto-école"
+    },
+    {
+      "name": "Créneaux Disponibles",
+      "description": "Route API des créneaux disponibles"
+    },
+    {
+      "name": "Créneau",
+      "description": "Routes API des créneaux d'examens"
+    },
+    {
+      "name": "Mandat",
+      "description": "Routes API des mandats"
+    },
+    {
+      "name": "Somme ETP",
+      "description": "Route API liée aux sommes des ETP des formateurs et des simulateurs"
+    },
+    {
+      "name": "Seuil formateur",
+      "description": "Routes API des informations sur les seuils formateur"
+    },
+    {
+      "name": "Centre-favori",
+      "description": "Routes API des centres d'examens favoris"
+    },
+    {
+      "name": "Candidat",
+      "description": "Routes API des candidats"
+    },
+    {
+      "name": "Resultat",
+      "description": "Routes API des résultats d'examen candidat"
+    }
+  ],
+  "paths": {
+    "/api/v2/auto-ecole/paniers/{panierId}/creneaux/{creneauId}/candidat": {
+      "put": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Assigner ou retirer un candidat d'un créneau d'un panier",
+        "description": "Cet endpoint permet d'assigner un candidat à un créneau d'examen, ou retirer un candidat d'un créneau. Ce candidat sera définitivement assigné à cet examen quand le panier sera validé. Pour retirer un candidat d'un créneau, il faut renseigner 'null' dans le champ candidatId.",
+        "operationId": "assignerOuRetirerCandidatSurUnCreneauDUnPanier",
+        "parameters": [
+          {
+            "name": "panierId",
+            "in": "path",
+            "description": "Id technique du panier.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "creneauId",
+            "in": "path",
+            "description": "Id technique du créneau sur lequel assigner ou retirer un candidat.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignerCandidatApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Le candidat a été assigné ou retiré du créneau du panier"
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - Le panier n'appartient pas à l'auto-école, elle n'a pas le droit de modifier son contenu.",
+            "content": {}
+          },
+          "404": {
+            "description": "CANDIDAT_INCONNU - Ce candidat n'existe pas<br />PANIER_INCONNU - Le panier n'existe pas<br />CRENEAU_PAS_DANS_LE_PANIER - Le créneau n'existe pas dans ce panier",
+            "content": {}
+          },
+          "422": {
+            "description": "CANDIDAT_DEJA_DANS_PANIER - Le candidat est déjà dans un panier.<br />CANDIDAT_SOUS_PENALITE - Le candidat est sous pénalité (délai de présentation).<br />CANDIDAT_AYANT_DEJA_OBTENU_SON_EXAMEN - Le candidat a déjà obtenu son examen pour le groupe demandé.<br />CANDIDAT_DEJA_INSCRIT - Le candidat est déjà inscrit sur un autre examen.<br />CANDIDAT_PAS_SOUS_MANDAT - Ce candidat n'est pas pris sous mandat par cette auto-école.<br />CANDIDAT_EN_ATTENTE_DE_RESULTAT - Ce candidat est en attente de résultat ou a un examen planifié aujourd'hui.<br />CANDIDAT_SANS_DEMANDE_ACTIVE - Le candidat n'a pas de demande active pour le groupe de permis demandé.<br />",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/panier/creneaux/{creneauId}": {
+      "put": {
+        "tags": [
+          "Panier"
+        ],
+        "summary": "Assigner un candidat à un créneau du panier",
+        "description": "CETTE ROUTE EST DÉPRÉCIÉE, utilisez plutôt PUT /api/v2/auto-ecole/paniers/{panierId}/creneaux/{creneauId}/candidat.",
+        "operationId": "assignerCandidat",
+        "parameters": [
+          {
+            "name": "creneauId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inclureEstCandidatObligatoire",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignerCandidatApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Le numéro de dossier a été assigné au créneau avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanierAncienApi"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Le candidat est sous pénalité.",
+            "content": {}
+          },
+          "404": {
+            "description": "Le créneau n'est pas dans le panier.",
+            "content": {}
+          },
+          "422": {
+            "description": "Ce candidat est en attente de résultat ou a un examen planifié aujourd'hui.",
+            "content": {}
+          }
+        },
+        "deprecated": true,
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Panier"
+        ],
+        "summary": "Supprimer un créneau du panier",
+        "description": "CETTE ROUTE EST DÉPRÉCIÉE, utilisez plutôt DELETE /paniers/{panierId}/creneaux/{creneauId}.",
+        "operationId": "supprimerCréneauDuPanier",
+        "parameters": [
+          {
+            "name": "creneauId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inclureEstCandidatObligatoire",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Le créneau a été supprimé du panier avec succès.",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanierAncienApi"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Le créneau n'est pas dans le panier.",
+            "content": {}
+          }
+        },
+        "deprecated": true,
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/email-notification": {
+      "put": {
+        "tags": [
+          "Auto-École"
+        ],
+        "summary": "Modifier l'adresse e-mail de notification d'une auto-école",
+        "description": "Permet à un employé de modifier l'adresse e-mail de notification de son auto-école.",
+        "operationId": "modifierEmailNotificationAutoEcole",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailNotificationAutoEcoleApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "L'adresse e-mail a bien été modifiée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoEcoleCompleteApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "L'adresse e-mail renseignée a un format erroné.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auto-ecole/examen-programme/{examenId}/candidat/{candidatId}/validation": {
+      "put": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Inscrire un candidat à un examen programmé",
+        "description": "Permet d'inscrire un candidat éligible à un examen de groupe permis A déjà réservé.",
+        "operationId": "inscrireUnCandidatAUnExamenProgrammé",
+        "parameters": [
+          {
+            "name": "examenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "candidatId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Le candidat a bien été inscrit à l'examen."
+          },
+          "403": {
+            "description": "FONCTIONNALITE_DESACTIVEE - La fonctionnalité est désactivée.",
+            "content": {}
+          },
+          "422": {
+            "description": "CANDIDAT_INCONNU - Le candidat n'a pas été trouvé.\n\nCANDIDAT_SOUS_PENALITE - Le candidat est actuellement sous pénalité et ne peut pas être inscrit à un examen.\n\nCANDIDAT_DEJA_INSCRIT - Le candidat est déjà inscrit à un examen.\n\nCANDIDAT_EN_ATTENTE_DE_RESULTAT - Le candidat est en attente des résultats d’un examen précédent.\n\nCANDIDAT_DEJA_DANS_PANIER - Le candidat est déjà présent dans le panier d’inscription.\n\nCANDIDAT_NON_ELIGIBLE - Le candidat n’est pas éligible à l’inscription à cet examen.\n\nCANDIDAT_SANS_DEMANDE_ACTIVE - Le candidat ne dispose d’aucune demande active.\n\nCANDIDAT_EN_ATTENTE_DE_RESULTAT - Le candidat est en attente des résultats d’un examen précédent.\n\nCANDIDAT_EN_DISPENSE_PRATIQUE - Le candidat est en dispense de l’épreuve pratique.\n\nCANDIDAT_A_DEJA_OBTENU_SON_PERMIS - Le candidat a déjà obtenu son permis.\n\nCANDIDAT_SANS_MANDAT_POUR_GROUPE_DEMANDE - Le candidat ne dispose pas du mandat requis pour le groupe de demande.\n\nEXAMEN_INCONNU - L'examen n'a pas été trouvé.\n\nEXAMEN_AYANT_DEJA_UN_CANDIDAT_INSCRIT - Un candidat est déjà inscrit sur cet examen.\n\nEXAMEN_DEJA_ANNULE - L’examen a déjà été annulé.\n\nEXAMEN_PASSE - L’examen est déjà passé.\n\nEXAMEN_PLATEAU_DEJA_REUSSI - L’épreuve du plateau a déjà été réussie.\n\nINSCRIPTION_EXAMEN_INTERDIT_PAR_AUTO_ECOLE - L'auto-école n'a pas le droit d'inscrire un candidat sur cet examen.\n\nINSCRIPTION_EXAMEN_CIRCULATION_IMPOSSIBLE - L’inscription à l’épreuve de circulation n’est pas possible dans ce contexte.\n\nCATEGORIE_PERMIS_NON_GEREE - La catégorie de permis n'est pas du groupe A.\n\n",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/planning/recherche": {
+      "post": {
+        "tags": [
+          "Créneau"
+        ],
+        "summary": "Rechercher des créneaux (disponibles ou déjà reservés)",
+        "description": "Permet d'obtenir la liste des créneaux pour une semaine, un centre d'examen et un groupe de permis donné.<br />Les types de créneaux renvoyés par l'API :<br /><ul><li>les créneaux disponibles à la réservation (`statutDeReservation: DISPONIBLE`) : tous ces créneaux peuvent être ajoutés à votre panier (voir routes \"Nouveau Panier\")</li><li>les créneaux indisponibles à la réservation car déjà réservés par votre AE (`statutDeReservation: RÉSERVÉ_PAR_MON_AUTO_ÉCOLE`) : dans ce cas, ces créneaux portent également l'information de l'examen associé</li><li>les créneaux indisponibles à la réservation car réservés par une autre AE (`statutDeReservation: RÉSERVÉ_PAR_AUTRE_AUTO_ÉCOLE`)</li><li>les créneaux indisponibles à la réservation car votre seuil est atteint sur le mois et le département considérés (`statutDeReservation: SEUIL_ATTEINT`) - ces créneaux vous seront accessibles 48h après leur date de publication, sous réserve qu'ils n'aient pas été réservés entre temps.</li></ul><br />Remarques :<br /><ul><li>les créneaux en cours de réservation par votre AE (= présents dans le(s) panier(s) de l'AE considérée) ne sont pas renvoyés</li><li>les créneaux disponibles mais non réservables car dans le passé ou le futur (trop) proche ne sont pas renvoyés</li></ul>",
+        "operationId": "rechercherPlanning",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechercheCreneauApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "La recherche du planning a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ElementDuPlanningApi"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PARAMETRE_INVALIDE - Le paramètre 'groupePermis' n'est pas valide.<br />CENTRE_INCONNU - Le centre '...' n'existe pas.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/paniers": {
+      "get": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Récupérer les paniers de l'auto-école de l'employé appelant",
+        "description": "Récupère tous les paniers de l'auto-école de l'employé appelant, triés par date de création décroissante. Il est possible de gérer la pagination avec les paramètres page (1 par défaut, doit être supérieure à 0) et par-page (20 par défaut, doit être compris entre 1 et 100 inclus).",
+        "operationId": "récupérerLesPaniers",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Le numéro de la page de résultats qu'on veut consulter. 1 par défaut.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            },
+            "example": 2
+          },
+          {
+            "name": "par-page",
+            "in": "query",
+            "description": "Le nombre de résultats par page qu'on veut consulter. 20 par défaut. Doit être compris entre 1 et 100.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            },
+            "example": 25
+          },
+          {
+            "name": "employe-auto-ecole-id",
+            "in": "query",
+            "description": "Filtre sur l'id de l'employé auto école.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "0f30bbf8-a6d2-49d3-8c93-6ae02bcaea2a"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La liste des paniers a été récupérée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginationApiPanierSansElementsApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PARAMETRE_INVALIDE - Le paramètre '...' est invalide.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Créer un panier pour une auto-école. Permet de renseigner de manière optionnelle un employé auto-école propriétaire",
+        "description": "Permet de créer un panier pour y ajouter ensuite des créneaux d'examen. Un panier doit être validé avant sa date d'expiration (30 minutes) sans quoi il est automatiquement supprimé.",
+        "operationId": "créerUnPanier",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreerPanierApi"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Le panier a été créé avec succès. L'URI de la nouvelle ressource se trouve dans le header Location.",
+            "headers": {
+              "Location": {
+                "description": "URI de la nouvelle ressource panier",
+                "style": "simple",
+                "schema": {
+                  "type": "string",
+                  "example": "https://api.permisdeconduire.gouv.fr/api/v2/auto-ecole/paniers/e7ab4793-18ac-4a7a-8967-060c6a4f8df9"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanierApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "EMPLOYE_AUTO_ECOLE_INEXISTANT - L'employé auto-école n'existe pas.<br />EMPLOYE_N_APPARTIENT_PAS_A_AUTO_ECOLE - L'employé '...' n'appartient pas à l'auto-école appelante.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/paniers/{panierId}/valider": {
+      "post": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Valider le panier de l'auto-école appelante",
+        "description": "Permet de valider toutes les réservations d'examen du panier de l'auto-école appelante. Un panier doit au moins avoir un créneau avec son candidat assigné avant de pouvoir être validé. Pour chaque examen réservé avec succès, un e-mail de convocation est envoyé au candidat·e.",
+        "operationId": "validerLePanier",
+        "parameters": [
+          {
+            "name": "panierId",
+            "in": "path",
+            "description": "Id technique du panier à valider.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La validation du panier a été effectuée avec succès. Un e-mail de convocation a été envoyé à chaque candidat·e et un e-mail de confirmation a été envoyé à l'auto-école",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationPanierApi"
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Le panier peut contenir des créneaux aux statuts suivants :<br />CRENEAU_RESERVE - Le créneau a été réservé.<br />CANDIDAT_PAS_SOUS_MANDAT - Le candidat n'est pas sous mandat.<br />CANDIDAT_SOUS_PENALITE - Le candidat est sous pénalité.<br />EXAMEN_DEJA_PREVU_POUR_CANDIDAT - Le candidat est déjà inscrit pour ce groupe de permis.<br />CANDIDAT_EN_ATTENTE_DE_RESULTAT - Le candidat est en attente de résultat.<br />INSCRIPTION_EXAMEN_CIRCULATION_IMPOSSIBLE - Le candidat n'a pas réussi son examen plateau et n'en a pas de programmé. OU Le candidat a un examen plateau programmé à moins de quatre jours.<br />VALIDATION_PANIER_TARDIVE - Le créneau a dépassé l'horaire de validation.<br />VALIDATION_PANIER_CRENEAU_NON_DISPONIBLE - Le créneau a été supprimé.<br />CRENEAU_DU_PANIER_SANS_CANDIDAT - Le créneau est sans candidat.<br />CANDIDAT_AYANT_DEJA_OBTENU_SON_EXAMEN - Le candidat a déjà obtenu son examen pour le groupe de permis demandé.<br />CANDIDAT_SANS_DEMANDE_ACTIVE - Le candidat n'a pas de demande active pour le groupe de permis demandé.<br />",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationPanierApi"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - Le panier n'appartient pas à l'auto-école, elle n'a pas le droit de le valider.",
+            "content": {}
+          },
+          "404": {
+            "description": "PANIER_INCONNU - Le panier n'existe pas",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/paniers/{panierId}/creneaux": {
+      "post": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Ajouter un créneau au panier",
+        "description": "Une fois ajouté au panier, il faut assigner un·e candidat·e à ce créneau (via l'API `/auto-ecole/paniers/{panierId}/creneaux/{creneauId}/candidat`) avant de pouvoir valider vos réservations (via l'API `/auto-ecole/paniers/{panierId}/valider`).<br />Lorsqu'un créneau est mis dans un panier, il devient indisponible à la réservation (aux autres auto-écoles ainsi qu'aux autres employés de l'auto-école considérée).<br />Un panier peut contenir :<br /><ul><li>un maximum de 12 places d'examen</li><li>des créneaux issus de différentes semaines, de différents centres ou de différents départements</li><li>mais ne peut pas contenir des créneaux de différents groupes de permis.</li></ul><br /><br />Attention : les créneaux en cours de réservation (présents dans les paniers de l'auto-école) sont pris en compte dans le calcul du nombre de places restantes avant l'atteinte du seuil formateur). Il peut également arriver qu'un créneau qui apparait disponible ne soit pas ajoutable au panier si une autre auto-école l'a ajouté à son panier entre temps, ou si le seuil formateur de l'auto-école a été atteint entre temps.",
+        "operationId": "ajouterCreneauAUnPanierApi",
+        "parameters": [
+          {
+            "name": "panierId",
+            "in": "path",
+            "description": "Id technique du panier.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inclureEstCandidatObligatoire",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AjouterCreneauApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Le créneau a été ajouté au panier avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanierApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "CRENEAU_INCONNU - Le créneau n'existe pas.",
+            "content": {}
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - Le panier n'appartient pas à l'auto-école, elle n'a pas le droit d'y ajouter un créneau.<br />INCOMPATIBILITE_INSPECTEUR_AUTO_ECOLE - L'inspecteur sur ce créneau fait l'objet d'une incompabilité avec votre auto-école.<br />AUTO_ECOLE_NA_AUCUNE_DECLARATION - L'auto-école n'a pas encore déclaré ses formateurs.<br />CRENEAU_NON_VISIBLE_POUR_CETTE_AUTO_ECOLE - Le créneau n'est pas visible pour cette auto-école dans ce département.",
+            "content": {}
+          },
+          "404": {
+            "description": "PANIER_INCONNU - Le panier n'existe pas",
+            "content": {}
+          },
+          "409": {
+            "description": "CRENEAU_DEJA_RESERVE - Le créneau est déjà réservé pour un autre examen.<br />CRENEAU_DEJA_RESERVE - Le créneau est déjà dans le panier ou dans un autre panier.",
+            "content": {}
+          },
+          "422": {
+            "description": "CRENEAU_NON_RESERVABLE_SEUIL_ATTEINT - Le seuil est atteint.<br />CRENEAU_NON_RESERVABLE_PLAFOND_ATTEINT - Le nombre maximal de réservation est atteint.<br />CRENEAU_DE_GROUPE_DIFFERENT - Créneaux de groupes différents.<br />PANIER_PLEIN - Le panier est plein.<br />CRENEAU_NON_DISPONIBLE - Le créneau n'est pas disponible pour les auto-écoles.<br />CRENEAU_NON_DISPONIBLE - Le créneau est dans le passé et n'est plus réservable.<br />CRENEAU_MIS_TROP_DE_FOIS_EN_PANIER_PAR_AE - Le créneau a déjà été mis trop de fois dans le panier de l'auto-école.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/paniers/{panierId}/creneaux-multiples": {
+      "post": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Ajouter des créneaux en lot au panier",
+        "description": "Permet d'ajouter au panier plusieurs créneaux en lot (36 max). Les créneaux sont ajoutés au panier incrémentalement, avec pour chaque créneau les vérifications fonctionnelles de la route `/auto-ecole/paniers/{panierId}/creneaux`. <br />Si l'un des créneau ne peut pas être ajouté dans le panier, il est ignoré et la route passe à l'ajout du créneau suivant.",
+        "operationId": "ajouterCreneauAUnPanierApi_1",
+        "parameters": [
+          {
+            "name": "panierId",
+            "in": "path",
+            "description": "Id technique du panier.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inclureEstCandidatObligatoire",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AjouterCreneauxMultiplesApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Les créneaux ont été ajoutés au panier avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreneauxMultiplesNouveauPanierApi"
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Certains créneaux ont été ajoutés au panier avec succès, d'autres sont en erreur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreneauxMultiplesNouveauPanierApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Aucun des créneaux n'a été réservé.<br />Le panier est déjà plein (36 créneaux). Aucun des créneaux n'a donc été ajouté au panier. <br />Le seuil formateur a déjà été atteint avant l'ajout des créneaux au panier. Aucun des créneaux n'a donc été ajouté au panier. <br />Le nombre maximum de places réservables sur ce département a déjà été atteint avant l'ajout des créneaux au panier. Aucun des créneaux n'a donc été ajouté au panier.",
+            "content": {}
+          },
+          "403": {
+            "description": "La fonctionnalité est désactivée.",
+            "content": {}
+          },
+          "404": {
+            "description": "La liste d'identifiants de créneaux passée en paramètre est vide ou dépasse le maximum de 12.<br />Le panier n'existe pas.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/panier/validation": {
+      "post": {
+        "tags": [
+          "Panier"
+        ],
+        "summary": "Valider le panier de l'employé appelant",
+        "description": "CETTE ROUTE EST DÉPRÉCIÉE, utilisez plutôt POST /auto-ecole/paniers/:panierId/valider.Permet de valider toutes les réservations d'examen du panier de l'employé appelant. Un panier doit au moins avoir un candidat assigné à un créneau avant de pouvoir valider le panier.",
+        "operationId": "validerPanier",
+        "responses": {
+          "204": {
+            "description": "La validation du panier a été effectuée avec succès."
+          },
+          "403": {
+            "description": "Le candidat est sans mandat pour le groupe demandé.<br />Le candidat est déjà inscrit pour ce groupe de permis.<br />Le créneau est sans candidat.",
+            "content": {}
+          }
+        },
+        "deprecated": true,
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/panier/creneaux": {
+      "post": {
+        "tags": [
+          "Panier"
+        ],
+        "summary": "Ajouter un créneau au panier",
+        "description": "CETTE ROUTE EST DÉPRÉCIÉE, utilisez plutôt POST /paniers/{panierId}/creneaux.",
+        "operationId": "ajouterCreneau",
+        "parameters": [
+          {
+            "name": "inclureEstCandidatObligatoire",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AjouterCreneauApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Le créneau a été ajouté au panier avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanierAncienApi"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Le créneau n'est pas disponible.<br />L'inspecteur sur ce créneau fait l'objet d'une incompabilité avec votre auto-école.<br />L'auto-école n'a pas encore déclaré ses formateurs.<br />Le créneau n'est pas visible pour cette auto-école dans ce département.",
+            "content": {}
+          },
+          "404": {
+            "description": "Le créneau n'existe pas.",
+            "content": {}
+          },
+          "409": {
+            "description": "Le créneau est déjà réservé pour un autre examen.<br />Le créneau est déjà dans le panier ou dans un autre panier.",
+            "content": {}
+          },
+          "422": {
+            "description": "Vous avez atteint votre seuil formateur dans le département [Département] pour le mois de [Mois]. Vous pourrez réserver ce créneau 48 h après sa publication s’il est toujours disponible.",
+            "content": {}
+          }
+        },
+        "deprecated": true,
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/panier/creneaux-multiples": {
+      "post": {
+        "tags": [
+          "Panier"
+        ],
+        "summary": "Ajouter en lot une liste de plusieurs créneaux au panier",
+        "description": "CETTE ROUTE EST DÉPRÉCIÉE, utilisez plutôt POST /paniers/{panierId}/creneaux-multiples.",
+        "operationId": "ajouterCreneauxMultiples",
+        "parameters": [
+          {
+            "name": "inclureEstCandidatObligatoire",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AjouterCreneauxMultiplesApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Les créneaux ont été ajoutés au panier avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreneauxMultiplesAncienPanierApi"
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Certains créneaux ont été ajoutés au panier avec succès, d'autres sont en erreur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreneauxMultiplesAncienPanierApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Aucun des créneaux n'a été réservé. <br />Le panier est déjà plein (36 créneaux). Aucun des créneaux n'a donc été ajouté au panier. <br />Le seuil formateur a déjà été atteint avant l'ajout des créneaux au panier. Aucun des créneaux n'a donc été ajouté au panier. <br />Le nombre maximum de places réservables sur ce département a déjà été atteint avant l'ajout des créneaux au panier. Aucun des créneaux n'a donc été ajouté au panier.",
+            "content": {}
+          },
+          "403": {
+            "description": "La fonctionnalité est désactivée.",
+            "content": {}
+          },
+          "404": {
+            "description": "La liste d'identifiants de créneaux passée en paramètre est vide ou dépasse le maximum de 12.",
+            "content": {}
+          }
+        },
+        "deprecated": true,
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/mandats": {
+      "post": {
+        "tags": [
+          "Mandat"
+        ],
+        "summary": "Prendre un·e candidat·e sous mandat",
+        "description": "Permet de lier un·e candidat·e à une auto-école. L'auto-école peut ainsi réserver un créneau d'examen au nom du ou de la candidat·e.<br />En cas de succès de la prise sous mandat, un e-mail est envoyé au candidat·e lui indiquant qu'il·elle vient d'être pris·e sous mandat par votre auto-école et lui permettant - si ce n'est pas déjà fait - de se créer un compte sur RdvPermis.<br />Dans le cas où le·a candidat·e serait déjà sous mandat d'une autre auto-école, l'API répond une erreur et un mail est envoyé au candidat·e lui indiquant que s'il·elle veut vous permettre de le·a prendre sous mandat, il·elle doit d'abord révoquer son mandat actuel.",
+        "operationId": "ajouteLeCandidatSousMandat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreerMandatApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Candidat·e pris·e sous mandat avec succès par l'auto-école connectée. Un e-mail a été envoyé au candidat·e. Si le candidat·e avait déjà créé un compte il n’y a pas de prise en compte de l’email renseigné.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoEcoleMandatApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "CANDIDAT_INCONNU - Le·a candidat·e n'existe pas.",
+            "content": {}
+          },
+          "409": {
+            "description": "EMAIL_DEJA_ATTRIBUE - L'adresse e-mail du candidat est déjà attribuée, merci d'en indiquer une autre.",
+            "content": {}
+          },
+          "422": {
+            "description": "CANDIDAT_SANS_DEMANDE_ACTIVE - Le·a candidat·e n'a pas de demande ou n'a aucune demande active pour le groupe de permis considérée.<br />EMAIL_MANQUANT - L'adresse e-mail du candidat n'est pas renseignée.<br />CANDIDAT_DEJA_SOUS_MANDAT - Le·a candidat·e est déjà sous mandat. Un e-mail a été envoyé au candidat·e.<br />CANDIDAT_DEJA_SOUS_MON_MANDAT - Le candidat est déja sous le mandat de l'auto-école.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/examens/remplacement": {
+      "post": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Remplacer le·a candidat·e d'un examen",
+        "description": "Permet de placer un·e candidat·e (`candidatRemplacantId`) sur un examen (`examenId`), en remplacement du ou de la candidat·e précédemment inscrit·e. L'ancien·ne candidat·e recevra un e-mail d'annulation de son examen, et le second recevra une convocation à son examen.<br />Il n'est pas possible d'effectuer un remplacement de candidat·e sur un examen programmé dans le passé ou dans le futur proche (= le jour même ainsi que le lendemain si le remplacement est effectué après l'heure de midi.",
+        "operationId": "remplacerExamen",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemplacementExamenApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Le·a candidat·e a été remplacé·e avec succès. Un e-mail a été envoyé à chacun·e des 2 candidat·e·s."
+          },
+          "400": {
+            "description": "EXAMEN_INCONNU - Examen inexistant.<br />CANDIDAT_INCONNU - Candidat inexistant.",
+            "content": {}
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - L'auto-école n'a pas le droit de modifier l'examen.",
+            "content": {}
+          },
+          "422": {
+            "description": "CANDIDAT_SOUS_PENALITE - Le candidat est sous pénalité.<br />CANDIDAT_DEJA_INSCRIT - Le candidat est déjà inscrit sur un autre examen.<br />CANDIDAT_DEJA_DANS_PANIER - Le candidat est déjà dans un panier.<br />CANDIDAT_EN_ATTENTE_DE_RESULTAT - Le candidat est en attente du résultat sur un autre examen.<br />NOMBRE_DE_REMPLACEMENTS_AUTORISES_ATTEINT - Le nombre de remplacement autorisé a été atteint.<br />CANDIDAT_PAS_SOUS_MANDAT - Le candidat n'est pas sous mandat.<br />EXAMEN_NON_MODIFIABLE - Le délai de remplacement pour l'examen est dépassé.CANDIDAT_AYANT_DEJA_OBTENU_SON_EXAMEN - Le candidat a déjà obtenu son examen pour le groupe demandé.<br />CANDIDAT_SANS_DEMANDE_ACTIVE - Le candidat n'a pas de demande active pour la catégorie de permis demandée.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/examens/permutation": {
+      "post": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Permuter deux examens programmés",
+        "description": "Permet de permuter (= intervertir) les candidats de deux examens programmés et à venir (il n'est pas possible de modifier/permuter des examens du passé ni du futur proche = ceux du jour ainsi que ceux du lendemain si la permutation est effectuée après l'heure de midi).<br />Chaque candidat recevra par e-mail une nouvelle convocation à l'examen du permis de conduire avec la nouvelle date et la nouvelle adresse du centre d'examen.",
+        "operationId": "permuterExamens",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExamenIdsAPermuterApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Les candidat·e·s ont été permuté·e·s avec succès. Un e-mail a été envoyé à chacun·e des 2 candidat·e·s."
+          },
+          "400": {
+            "description": "EXAMEN_INCONNU - L'examen est inconnu.",
+            "content": {}
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - L'auto-école n'a pas le droit de modifier l'examen.",
+            "content": {}
+          },
+          "422": {
+            "description": "PERMUTATION_IMPOSSIBLE - Permutation impossible (examens non programmés, de groupe de permis différent, de type différent, dans des départements différents, avec une pénalité active, ne respectant pas le délai entre circulation et plateau, programmés à une date qui les rend non-modifiables,ou impliquant un examen en non nominatif).",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/employes": {
+      "get": {
+        "tags": [
+          "Employé Auto-École"
+        ],
+        "summary": "Récupérer les employés de l'auto-école",
+        "description": "Permet de récupérer la liste des employés de l'auto-école connectée.",
+        "operationId": "récupérerEmployésAutoÉcole",
+        "responses": {
+          "200": {
+            "description": "La récupération des employés a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeAutoEcolePaginationApi"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Employé Auto-École"
+        ],
+        "summary": "Créer un compte employé auto-école",
+        "description": "Permet de créer un compte pour un employé dans la même auto-école que l'utilisateur connecté. Envoie un e-mail contenant un mot de passe temporaire à l'employé.",
+        "operationId": "créerCompteEmployéAutoÉcole",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreationCompteEmployeAutoEcoleApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Le compte employé a été créé avec succès. Un e-mail a été envoyé à l'employé.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeAutoEcoleApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "EMAIL_INVALIDE - L'adresse e-mail '...' a un format non valide. <br />PARAMETRE_INVALIDE - Le paramètre '...' est invalide.",
+            "content": {}
+          },
+          "409": {
+            "description": "EMAIL_DEJA_ATTRIBUE - L'adresse e-mail est déjà utilisée au sein de RdvPermis (pour un employé de cette auto-école ou d'une autre auto-école).",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/centres/recherche": {
+      "post": {
+        "tags": [
+          "Centre"
+        ],
+        "summary": "Rechercher des centres",
+        "description": "Permet d'obtenir la liste des centres pour un département donné et pour un groupe de permis donné (certains centres sont spécialisés sur un groupe d'examen quand d'autres centres proposent plusieurs groupes d'examen).<br /><br />Le filtre <code>estFerme</code> est optionnel :<br /><ul><li><code>true</code> : uniquement les centres fermés.</li><li><code>false</code> : uniquement les centres actifs.</li><li>Absent : tous les centres sont retournés sans distinction de statut.</li></ul><em>NB :</em> un centre actif est un centre ouvert avec des sessions prévues.",
+        "operationId": "rechercherDesCentres",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechercheCentreApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "La récupération des centres a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CentreApi"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PARAMETRE_INVALIDE - Le paramètre 'groupePermis' n'est pas valide.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/centres-favoris": {
+      "get": {
+        "tags": [
+          "Centre-favori"
+        ],
+        "summary": "Récupérer les centres favoris d'une auto-école",
+        "operationId": "récupérerCentresFavoris",
+        "responses": {
+          "200": {
+            "description": "La récupération des centres favoris a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CentreFavoriApi"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Centre-favori"
+        ],
+        "summary": "Enregistrer les centres favoris d'une auto-école",
+        "operationId": "enregistrerCentresFavoris",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupePermisCentresFavorisInputApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "L'enregistrement des centres favoris a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupePermisCentresFavorisInputApi"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "La fonctionnalité est désactivée.",
+            "content": {}
+          },
+          "404": {
+            "description": "Ce centre n'existe pas",
+            "content": {}
+          },
+          "422": {
+            "description": "Un ou plusieurs centres sont fermés.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/candidats/recherche": {
+      "post": {
+        "tags": [
+          "Candidat"
+        ],
+        "summary": "Rechercher les candidats éligibles à l'inscription sur un créneau d'examen",
+        "description": "Permet d'obtenir la liste des candidats éligibles à l'assignation sur le créneau renseigné, garantissant ainsi que l'inscription du candidat·e sur le créneau sera possible.<br />Pour être éligible, un·e candidat·e doit notamment être :<br /><ul><li>sous mandat de l'auto-école</li><li>dans le bon groupe de permis</li><li>ne pas être déjà assigné·e à un créneau en cours de réservation</li><li>ne doit pas avoir un examen, du même groupe de permis que celui du créneau, planifié aujourd'hui</li><li>ne pas être soumis·e à un délais de présentation à la date du créneau renseigné</li><li>ne pas être déjà inscrit·e à un examen ou en attente de résultat d'examen</li><li>ne pas être soumis·e à des pénalités</li><li>avoir une demande active dans la catégorie de permis demandée</li><li>avoir une demande active plus récente que son dernier examen obtenu pour la catégorie demandée</li><li>dans le cas d'une épreuve de circulation du permis A, avoir déjà réussi l'épreuve plateau ou à minima être inscrit·e à une épreuve plateau au moins 4 jours en amont du créneau sélectionné.</li></ul><br /><br />Cette API renvoie également les candidats non éligibles (`estEligible: false`) avec le motif de non éligibilité le cas échéant.<br />Remarques sur l'usage de cette API :<br /><ul><li>il est recommandé d'utiliser un seul mode de recherche (par numéro de dossier ou par nom) même s'il est techniquement possible de combiner les 2</li><li>la recherche par nom est insensible à la casse</li><li>la recherche par nom est insensible aux caractères accentués</li><li>il n'y a pas de nombre de caractères minimal pour effectuer une recherche partielle</li><li>lors d'une recherche partielle, la chaine de caractère est recherchée au sein du nom ou du numéro de dossier (et pas uniquement au début).</li></ul>",
+        "operationId": "rechercherCandidatsPourAssignationCreneau",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechercheCandidatApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "La recherche des candidat·e·s a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CandidatAvecEligibiliteApi"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "CRENEAU_INCONNU - Le créneau est inconnu.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/candidats-mandats/recherche": {
+      "post": {
+        "tags": [
+          "Mandat"
+        ],
+        "summary": "Lister les candidat·s sous mandat d'une auto-école",
+        "description": "Permet d'obtenir la liste des candidat·s mandants d'une auto-école ou de faire une recherche parmi ces candidat·s.<br />Pour obtenir la liste complète (paginée) des candidat·e·s mandants de l'auto-école, il suffit de ne pas définir de filtre.<br />Fonctionnement de la recherche :<br /><ul><li>il est possible de n'utiliser qu'un seul type de filtre (par groupe de permis, par nom ou par numéro de dossier) ou de les combiner</li><li>la recherche par nom est insensible à la casse</li><li>la recherche par nom est insensible aux caractères accentués</li><li>il n'y a pas de nombre de caractères minimal pour effectuer une recherche partielle</li><li>lors d'une recherche partielle, la chaine de caractère est recherchée au début du nom ou du numéro de dossier</li></ul>Le groupe de permis A est pris pour exemple mais c'est valable pour tous les groupes de permis.<br />Pour les details examens, certains champs ne sont pas présents en fonction du groupe de permis A ( A1-A2), B(B1-B) :<br /> ex : Groupe de permis B, les champs suivant seront automatiquement nulls: <br /><ul><li> derniereDateCirculation</li><li> statutCirculation </li><li> nombreEchecCirculation </li><li> derniereDatePlateau</li><li> statutPlateau</li></ul>Le champ derniereDateExamenTheorique désigne la date de réussite de l’examen théorique ",
+        "operationId": "recupererCandidatsMandatsParAutoEcole",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechercheCandidatEtPaginationApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "La liste des candidats sous mandat a été récupérée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginationApiAutoEcoleCandidatApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PARAMETRE_INVALIDE - Le paramètre '...' est invalide.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/candidats-groupe-lourd/recherche": {
+      "post": {
+        "tags": [
+          "Candidat"
+        ],
+        "summary": "Lister les candidat·e·s ayant passé un examen poids lourds avec une auto-école",
+        "description": "Permet d'obtenir une liste avec le dernier résultat pour chaque catégorie d'un candidat passé avec une auto-école ou de faire une recherche parmi ces candidat·e·s.<br />Pour obtenir la liste complète (paginée) des candidat·e·s en groupe lourd de l'auto-école, il suffit de ne pas définir de filtre.<br />Fonctionnement de la recherche :<br /><ul><li>Attention : le groupe de permis doit toujours être 'CE' ici</li><li>il est possible de n'utiliser qu'un seul type de filtre (par nom ou par numéro de dossier, le groupe de permis doit toujours être 'CE' ici) ou de les combiner</li><li>la recherche par nom est insensible à la casse</li><li>la recherche par nom est insensible aux caractères accentués</li><li>il n'y a pas de nombre de caractères minimal pour effectuer une recherche partielle</li><li>lors d'une recherche partielle, la chaine de caractère est recherchée au début du nom ou du numéro de dossier</li></ul>",
+        "operationId": "récupérerCandidatsGroupeLourdParAutoEcole",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechercheCandidatEtPaginationApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "La liste des candidats groupe lourd a été récupérée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginationApiAutoEcoleCandidatApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PARAMETRE_INVALIDE - Le paramètre '...' est invalide.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/somme-etp": {
+      "get": {
+        "tags": [
+          "Somme ETP"
+        ],
+        "summary": "Récupérer la somme des ETP des formateurs et des simulateurs de l'auto-école appelante",
+        "operationId": "récupérerLaSommeEtp",
+        "parameters": [
+          {
+            "name": "avecHeuresFormation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La récupération de la somme des ETP a été effectuée avec succès. Format de réponse utilisé quand le paramètre avecHeuresFormation vaut true",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EtpApi"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/resultats/examen-pratique/dernier": {
+      "get": {
+        "tags": [
+          "Resultat"
+        ],
+        "summary": "Récupérer le résultat du dernier examen pratique passé d'un candidat mandaté, par catégorie de permis.",
+        "description": "Le résultat du dernier examen pratique passé du candidat sera remonté s'il réunit les conditions suivantes : <br /> - Le résultat n'est pas associé à un examen pratique supprimé (par exemple, en cas d'erreur) <br /> - Le résultat de l'examen pratique ne date pas du jour même <br /> - Dans le cas d'un résultat pratique de circulation réussi, celui-ci doit avoir été transmis au SNPC pour être remonté",
+        "operationId": "recupererDernierResultatPratiqueCandidatParCategoriePermis",
+        "parameters": [
+          {
+            "name": "numero-dossier",
+            "in": "query",
+            "description": "Numéro de dossier du candidat recherché.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 983354655983354600
+          },
+          {
+            "name": "categorie-permis",
+            "in": "query",
+            "description": "catégorie du permis.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "A1",
+                "A2",
+                "B",
+                "BE",
+                "B1",
+                "C",
+                "CE",
+                "C1",
+                "C1E",
+                "D",
+                "DE",
+                "D1",
+                "D1E"
+              ]
+            },
+            "example": "B1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Le résultat du dernier examen pratique passé pour la catégorie de permis a été récupéré avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DernierResultatPratiqueCandidatApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "CANDIDAT_INCORRECT - Le numéro de dossier renseigné est associé à un candidat inconnu ou non mandaté par l'auto-école pour cette catégorie de permis.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/paniers/{panierId}": {
+      "get": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Récupérer un panier",
+        "description": "Permet de récupérer un panier via son id. Un panier peut être consulté par tous·tes les employé·e·s d'une même auto-école.",
+        "operationId": "récupérerUnPanier",
+        "parameters": [
+          {
+            "name": "panierId",
+            "in": "path",
+            "description": "Id technique du panier.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inclureEstCandidatObligatoire",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Le panier a été récupéré avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanierApi"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - Le panier n'appartient pas à l'auto-école, elle n'a pas le droit de le consulter.",
+            "content": {}
+          },
+          "404": {
+            "description": "PANIER_INCONNU - Le panier n'existe pas.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Supprimer un panier et rendre les créneaux disponibles",
+        "description": "Supprime un panier selon son id. Le panier doit appartenir à l'auto-école de l'employé appelant. Cela rend les créneaux disponibles aux auto-écoles.",
+        "operationId": "supprimerLePanier",
+        "parameters": [
+          {
+            "name": "panierId",
+            "in": "path",
+            "description": "Id technique du panier.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Le panier a été supprimé avec succès."
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - Le panier n'appartient pas à l'auto-école, elle n'a pas le droit de le supprimer.",
+            "content": {}
+          },
+          "404": {
+            "description": "PANIER_INCONNU - Le panier n'existe pas",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/panier": {
+      "get": {
+        "tags": [
+          "Panier"
+        ],
+        "summary": "Récupérer le panier courant de l'employé appelant trié par date et heure de début",
+        "description": "CETTE ROUTE EST DÉPRÉCIÉE, utilisez plutôt GET /paniers ou GET /paniers/:id.",
+        "operationId": "récupérerLePanier",
+        "parameters": [
+          {
+            "name": "inclureEstCandidatObligatoire",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Le panier a été récupéré avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanierAncienApi"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true,
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Panier"
+        ],
+        "summary": "Vider le panier de l'employé appelant",
+        "description": "CETTE ROUTE EST DÉPRÉCIÉE, utilisez plutôt DELETE /paniers/{panierId}.",
+        "operationId": "viderLePanier",
+        "responses": {
+          "204": {
+            "description": "Le panier a été vidé avec succès."
+          }
+        },
+        "deprecated": true,
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/moi": {
+      "get": {
+        "tags": [
+          "Auto-École"
+        ],
+        "summary": "Informations sur l'auto-école",
+        "description": "Obtenir les informations de l'auto-école connectée (= liée au token JWT).<br />Cette API permet notamment de récupérer :<br /><ul><li>l'identifiant technique de l'auto-école (utile pour certaines API)</li><li>l'adresse e-mail à laquelle sont envoyées les notifications de l'auto-école (par exemple en cas de révocation d'un mandat par l'un de ses élèves)</li><li>l'information selon laquelle l'auto-école a été bloquée (estBloque:true) par le BER ; dans ce cas, celle-ci ne peut plus effectuer de réservation d'examen (mais peut encore se connecter à RdvPermis).</li><li>le nombre de formateurs déclarés par l'auto-école (par département et par groupe de permis).</li></ul>",
+        "operationId": "récupérerAutoEcoleAppelante",
+        "responses": {
+          "200": {
+            "description": "La récupération des informations de l'auto-école a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoEcoleCompleteApi"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/informations-seuil-departement": {
+      "get": {
+        "tags": [
+          "Seuil formateur"
+        ],
+        "summary": "Récupérer les informations de seuil formateur de l'auto-école par groupe de permis",
+        "description": "Permet d'obtenir, pour un mois, un département et un groupe de permis donnés, les informations de seuil d'une auto-école à savoir :<br /><ul><li>le seuil formateur de l'auto-école</li><li>le nombre d'examens (encore) réservables (sur le mois, le département et le groupe de permis considérés) avant d'atteindre ce seuil</li><li>un rappel du nombre de formateurs déclarés.</li></ul><br />Une fois le seuil atteint pour un mois, un département et un groupe de permis donnés, les créneaux ne sont réservables seulement 48h après leur publication (voir API Créneau).<br /><br />Le seuil peut se calculer pour les groupes de permis A et B.",
+        "operationId": "récupérerInformationsDuSeuilFormateur",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "description": "Date pour laquelle on souhaite obtenir les informations du seuil formateur (au format yyyy-MM-dd). Peut correspondre à n'importe quel jour du mois.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "code-departement",
+            "in": "query",
+            "description": "Le département pour lequel on souhaite obtenir les informations du seuil formateur.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupe-permis",
+            "in": "query",
+            "description": "Groupe de permis pour laquelle on souhaite obtenir les informations du seuil formateur. Si aucun groupe n'est renseignée, on récupère le seuil pour le groupe de permis B.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La récupération des informations de seuil formateur a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputSeuilFormateur"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "DATE_INVALIDE ou PARAMETRE_INVALIDE - Date non valide (date attendue au format yyyy-MM-dd).<br />CODE_DEPARTEMENT_INVALIDE - Le département est invalide ou inactif.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/examens": {
+      "get": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Lister les examens programmés d'un jour donné",
+        "description": "Permet d'obtenir une liste des examens programmés - uniquement dans le futur - pour une date et un groupe de permis donné.",
+        "operationId": "récupérerExamens",
+        "parameters": [
+          {
+            "name": "statut",
+            "in": "query",
+            "description": "Le statut des examens à récupérer. Seul le statut PROGRAMME est accepté pour le moment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROGRAMME"
+              ]
+            },
+            "example": "PROGRAMME"
+          },
+          {
+            "name": "groupe-permis",
+            "in": "query",
+            "description": "Le groupe de permis des examens à récupérer.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B"
+              ]
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "description": "La date du jour sur lequel récupérer les examens, au format yyyy-MM-dd. Cette date ne peut pas être dans le passé.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2021-08-20"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La récupération des examens a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExamenApi"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "STATUT_EXAMEN_NON_AUTORISE - Le statut demandé n'est pas autorisé.<br />DATE_DANS_LE_PASSE - La date '...' est dans le passé et est donc invalide.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/examens/{examenId}": {
+      "get": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Récupérer un examen",
+        "description": "Permet d'obtenir un examen en fonction de son id.",
+        "operationId": "récupérerUnExamen",
+        "parameters": [
+          {
+            "name": "examenId",
+            "in": "path",
+            "description": "Id technique de l'examen.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La récupération de l'examen a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamenApi"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - L'auto-école n'a pas le droit de consulter l'examen.",
+            "content": {}
+          },
+          "404": {
+            "description": "EXAMEN_INCONNU - L'examen est inconnu.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Annuler un examen",
+        "description": "Permet d'annuler un examen à partir de son id. Envoie un e-mail au candidat en cas de succès.",
+        "operationId": "annulerExamen",
+        "parameters": [
+          {
+            "name": "examenId",
+            "in": "path",
+            "description": "Id de l'examen à annuler.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "faa975a2-1fee-43e7-9786-25246726e273"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "L'examen a été annulé avec succès. Un e-mail a été envoyé au candidat."
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - L'auto-école n'a pas le droit de modifier l'examen.",
+            "content": {}
+          },
+          "404": {
+            "description": "EXAMEN_INCONNU - L'examen est inconnu.",
+            "content": {}
+          },
+          "422": {
+            "description": "EXAMEN_DEJA_ANNULE - L'examen est deja annulé",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/examens/permutables": {
+      "get": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Lister les examens éligibles à la permutation",
+        "description": "Permet de lister les examens éligibles à la permutation (= inversion des candidat·e·s sur 2 examens déjà programmés) avec un examen donné et pour un jour donné.<br />Aujourd'hui sont éligibles : les examens sans limitation dans le temps, d'un même type d'épreuve et prévus sur un même département (peu importe le centre) - et bien sûr entre 2 candidat·e·s d'une même auto-école.",
+        "operationId": "récupérerExamensEligiblesALaPermutation",
+        "parameters": [
+          {
+            "name": "examen-permute-id",
+            "in": "query",
+            "description": "L'id de l'examen que l'on souhaite permuter.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "f1afad80-cd28-4c7e-a7e2-af637c7516c7"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "description": "La journée pour laquelle on cherche des examens éligibles à la permutation, au format yyyy-MM-dd. ",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2020-08-20"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Les examens ont été récupérés avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExamenApi"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "EXAMEN_INCONNU - L'examen est inconnu.",
+            "content": {}
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - L'auto-école n'a pas le droit de consulter cet examen.",
+            "content": {}
+          },
+          "422": {
+            "description": "EXAMEN_NON_MODIFIABLE - Il est trop tard pour que l'examen soit permuté.EXAMEN_NON_NOMINATIF - L'examen n'a pas de candidat rattaché.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/examens/nombre-de-remplacement": {
+      "get": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Récupérer les nombres de remplacements de candidat autorisés et restants d'une auto-école sur un mois.",
+        "description": "Permet d'obtenir le nombre de remplacements de candidat sur des examens autorisés par mois, par groupe de permis pour l'auto-école connectée, ainsi que le nombre restant de remplacements autorisés sur un mois donné.<br />Le nombre total de remplacements autorisé est proportionnel au total des ETP calculés par groupe de permis pour l'auto-école.",
+        "operationId": "recupererNombreDeRemplacementsRestants",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "description": "La date pour déterminer sur quel mois on veut récupérer ces nombres de remplacements (autorisés et restants), au format yyyy-MM-dd.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2021-08-20"
+          },
+          {
+            "name": "groupe-permis",
+            "in": "query",
+            "description": "Groupe de permis pour lequel on souhaite obtenir le nombre de remplacements restants.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La récupération du nombre de remplacements a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemplacementCandidatParAutoEcoleApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Le paramètre groupePermis est invalide.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/examens/dates": {
+      "get": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Lister les prochaines journées d'examen",
+        "description": "Permet de lister les jours, à partir d'une date donnée, sur lesquels l'auto-école considérée a des examens de programmés - et ce pour un groupe de permis donné.<br />La liste contient au maximum 50 jours. Elle est ordonnée par date croissante.<br />Cette API est utile pour récupérer une liste de jours avec lesquels appeler ensuite l'API `GET /api/v2/auto-ecole/examens` qui liste les examens d'un jour donné (voir ci-dessus).",
+        "operationId": "listerLesDatesDesProchainsExamensProgrammés",
+        "parameters": [
+          {
+            "name": "statut",
+            "in": "query",
+            "description": "Le statut des examens à chercher. Seul le statut PROGRAMME est accepté pour le moment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROGRAMME"
+              ]
+            },
+            "example": "PROGRAMME"
+          },
+          {
+            "name": "date-debut",
+            "in": "query",
+            "description": "La date (incluse) à partir de laquelle chercher des jours sur lesquels l'auto-école a des examens de programmés, au format yyyy-MM-dd. La date ne doit pas être dans le passé.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2021-08-20"
+          },
+          {
+            "name": "groupe-permis",
+            "in": "query",
+            "description": "Le groupe de permis des journées d'examens à chercher.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B",
+                "CE"
+              ]
+            },
+            "example": "A"
+          },
+          {
+            "name": "creneauSansCandidat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La liste des prochaines journées sur lesquelles des examens sont programmés a été récupérée avec succès. Les dates sont au format yyyy-MM-dd.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": [
+                    "2021-08-30"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "STATUT_EXAMEN_NON_AUTORISE - Le statut demandé n'est pas autorisé.<br />DATE_DANS_LE_PASSE - La date '...' est dans le passé et est donc invalide.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/examens-pagines": {
+      "get": {
+        "tags": [
+          "Examen"
+        ],
+        "summary": "Lister les prochaines journées d'examens paginés",
+        "description": "Permet de lister les examens programmés pour une auto école, à partir d'une date donnée et d'un groupe de permis donné.<br />Seul le statut d'examen PROGRAMME et le groupe de permis CE (poids lourds) sont gérés.",
+        "operationId": "récupérerExamensPaginés",
+        "parameters": [
+          {
+            "name": "date-debut",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "par-page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "groupe-permis",
+            "in": "query",
+            "description": "Le groupe de permis des examens à chercher. Seul le groupe CE (poids lourds) est acceptée pour le moment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CE"
+              ]
+            },
+            "example": "CE"
+          },
+          {
+            "name": "statut",
+            "in": "query",
+            "description": "Le statut des examens à chercher. Seul le statut PROGRAMME est accepté pour le moment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROGRAMME"
+              ]
+            },
+            "example": "PROGRAMME"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La liste des examens programmés après la date spécifiée a été récupérés avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginationApiExamenApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "STATUT_EXAMEN_NON_AUTORISE - Le statut demandé n'est pas autorisé.<br />GROUPE_PERMIS_NON_GERE - Le groupe de permis '' n'est pas autorisé.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/employes/moi": {
+      "get": {
+        "tags": [
+          "Employé Auto-École"
+        ],
+        "summary": "Informations sur l'employé d'auto-école",
+        "description": "Obtenir les informations (identifiant + nom + prénom + adresse e-mail) de l'employé·e d'auto-école connecté·e (= liées au token JWT appelant), ainsi que les informations de son auto-école (voir API `/auto-ecole/moi`).",
+        "operationId": "récupérerEmployéAutoEcoleAppelant",
+        "responses": {
+          "200": {
+            "description": "La récupération de l'employé d'auto-école a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeAvecAutoEcoleApi"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/crenodispo": {
+      "get": {
+        "tags": [
+          "Créneaux Disponibles"
+        ],
+        "summary": "Récupérer les créneaux disponibles",
+        "description": "Permet d'obtenir la liste des créneaux pour une semaine, un groupe de permis A ou B, et pour 10 centres<br />Les types de créneaux renvoyés par l'API :<br /><ul><li>les créneaux disponibles à la réservation (`statutDeReservation: DISPONIBLE`)</li><li>les créneaux indisponibles à la réservation car votre seuil est atteint sur le mois et le département considérés - ces créneaux vous seront accessibles 48h après leur date de publication, sous réserve qu'ils n'aient pas été réservés entre temps.</li></ul><br />Remarques :<br /><ul><li>les créneaux en cours de réservation par votre AE (= présents dans le(s) panier(s) de l'AE considérée) ou dans le panier des autres AE ne sont PAS renvoyés</li><li>les créneaux indisponibles à la réservation car déjà réservés par votre AE ou un autre AE ne sont PAS renvoyés</li><li>les créneaux trop proches (dont l'heure limite de réservation est dépassée) ne sont PAS renvoyés</li></ul>",
+        "operationId": "recupererCreneauxDisponibles",
+        "parameters": [
+          {
+            "name": "centres-ids",
+            "in": "query",
+            "description": "La liste des identifiants des centres à inclure dans la recherche. Pour des raisons de performances, on limite à 10 le nombre de centres en paramètre.",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "groupe-permis",
+            "in": "query",
+            "description": "Le groupe de permis A ou B de la recherche",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B"
+              ]
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "description": "La date de la semaine à rechercher au format yyyy-MM-dd. La recherche s'effectue du lundi au vendredi de la semaine comprenant cette date.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La recherche des créneaux disponibles a été effectuée avec succès. Si l'id d'un centre est incorrecte, aucun créneau concernant ce centre n'est retourné.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CreneauDisponibleApi"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PARAMETRE_INVALIDE - Le paramètre '...' n'est pas valide.",
+            "content": {}
+          },
+          "403": {
+            "description": "TROP_DE_CENTRES_EN_PARAMETRE - Le nombre de centre en paramètre dépasse le maximum de 10 centres.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/crenodispo/date": {
+      "get": {
+        "tags": [
+          "Créneaux Disponibles"
+        ],
+        "summary": "Récupérer la date du premier créneau disponible",
+        "description": "Permet d'obtenir la date du premier créneau disponible sur un intervalle de 6 semaines en partant de la date passé en paramètre, un groupe de permis A ou B, et pour 10 centres max",
+        "operationId": "recupererDatePremierCreneauDisponible",
+        "parameters": [
+          {
+            "name": "centres-ids",
+            "in": "query",
+            "description": "La liste des identifiants des centres à inclure dans la recherche. Pour des raison de performences, on limite à 10 le maximum de centres en paramètre.",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "groupe-permis",
+            "in": "query",
+            "description": "Le groupe de permis A ou B de la recherche",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B"
+              ]
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "description": "La date au format yyyy-MM-dd à partir de laquelle la recherche doit commencer.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La recherche a été effectuée avec succès. Si l'id d'un centre est incorrecte, la date d'aujourd'hui est retournée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "date"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PARAMETRE_INVALIDE - Le paramètre '...' n'est pas valide.",
+            "content": {}
+          },
+          "403": {
+            "description": "TROP_DE_CENTRES_EN_PARAMETRE - Le nombre de centre en paramètre dépasse le maximum de 10 centres.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/centres/{centreId}": {
+      "get": {
+        "tags": [
+          "Centre"
+        ],
+        "summary": "Récupérer un centre via son id",
+        "operationId": "récupérerCentreParId",
+        "parameters": [
+          {
+            "name": "centreId",
+            "in": "path",
+            "description": "Id technique du centre recherché.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "b6f669e8-80aa-4f05-a067-55d788c0f370"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La récupération du centre a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CentreApi"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ce centre n'existe pas.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/affectations-simulateurs": {
+      "get": {
+        "tags": [
+          "Simulateur"
+        ],
+        "summary": "Récupérer les affectations des simulateurs de l'auto-école appelante",
+        "operationId": "récupérerLesSimulateurs",
+        "responses": {
+          "200": {
+            "description": "La récupération des affectations des simulateurs a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SimulateurAffectationApi"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/affectations-formateurs": {
+      "get": {
+        "tags": [
+          "Formateur"
+        ],
+        "summary": "Lister les affectations des formateurs de l'auto-école",
+        "operationId": "récupérerLesFormateurs",
+        "responses": {
+          "200": {
+            "description": "La récupération des affectations des formateurs a été effectuée avec succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FormateurAffectationApi"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/paniers/{panierId}/creneaux/{creneauId}": {
+      "delete": {
+        "tags": [
+          "Nouveau Panier"
+        ],
+        "summary": "Supprimer un créneau du panier",
+        "description": "Le créneau supprimé devient alors de nouveau disponible à la réservation pour tous.",
+        "operationId": "supprimerCréneauDuPanier_1",
+        "parameters": [
+          {
+            "name": "panierId",
+            "in": "path",
+            "description": "Id technique du panier.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "creneauId",
+            "in": "path",
+            "description": "Id technique du créneau à supprimer du panier.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Le créneau a été supprimé du panier avec succès."
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - Le panier n'appartient pas à l'auto-école, elle n'a pas le droit de supprimer un de ses créneaux.",
+            "content": {}
+          },
+          "404": {
+            "description": "PANIER_INCONNU - Le panier n'existe pas.<br />CRENEAU_PAS_DANS_LE_PANIER - Le créneau n'est pas dans le panier.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    },
+    "/api/v2/auto-ecole/employes/{employeAutoEcoleId}": {
+      "delete": {
+        "tags": [
+          "Employé Auto-École"
+        ],
+        "summary": "Supprimer un compte employé auto-école",
+        "description": "Cette route permet de supprimer un compte employé de l'auto-école connectée.<br /><ul><li>Si cet employé possède un panier en cours d'utilisation, il sera supprimé.</li><li>Il n'est pas possible de supprimer le dernier compte employé auto-école.</li></ul>",
+        "operationId": "supprimerCompteEmployéAutoEcole",
+        "parameters": [
+          {
+            "name": "employeAutoEcoleId",
+            "in": "path",
+            "description": "Id technique de l'employé auto-école à supprimer.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Le compte employé a été supprimé avec succès."
+          },
+          "403": {
+            "description": "ACTION_INTERDITE - L'employé ne fait pas partie de votre auto-école.",
+            "content": {}
+          },
+          "404": {
+            "description": "EMPLOYE_AUTO_ECOLE_INEXISTANT - Le compte employé n'existe pas.",
+            "content": {}
+          },
+          "422": {
+            "description": "AUTO_SUPPRESSION_COMPTE_EMPLOYE - Impossible de supprimer son propre compte.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "Access Token": []
+          },
+          {
+            "Formation": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssignerCandidatApi": {
+        "type": "object",
+        "properties": {
+          "candidatId": {
+            "type": "string",
+            "description": "Id du ou de la candidat·e à assigner. Si la valeur `null` est renseignée, cela a pour effet de retirer le·a candidat·e assigné·e à ce créneau d'examen.",
+            "example": "890bc5f1-76c8-4b78-adc6-cc92b0ecff30"
+          }
+        },
+        "title": "Corps d'assignation de candidat à un créneau"
+      },
+      "CandidatApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du candidat",
+            "example": "6060e828-bbce-4fbe-9cd4-c11d0df889cf"
+          },
+          "nom": {
+            "type": "string",
+            "description": "Nom du candidat",
+            "example": "Dupont"
+          },
+          "prenom": {
+            "type": "string",
+            "description": "Prénom du candidat",
+            "example": "Louis"
+          },
+          "numeroDossier": {
+            "type": "string",
+            "description": "Numéro de dossier du candidat",
+            "example": "01234567890909"
+          },
+          "dateNaissance": {
+            "type": "string",
+            "format": "date",
+            "description": "Date de naissance du candidat (format ISO-8601)",
+            "example": "1985-02-15"
+          },
+          "email": {
+            "type": "string",
+            "description": "Adresse e-mail du candidat",
+            "example": "louis.dupont@yahoo.com"
+          }
+        },
+        "title": "Candidat"
+      },
+      "CentreApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du centre",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d64"
+          },
+          "nom": {
+            "type": "string",
+            "description": "Nom du centre",
+            "example": "MIRANDA CARS"
+          },
+          "codeDepartement": {
+            "type": "string",
+            "description": "Numéro du département",
+            "example": "011"
+          },
+          "adresse": {
+            "type": "string",
+            "description": "Adresse du centre",
+            "example": "HALLE DES 5 FONTAINES"
+          },
+          "complementAdresse": {
+            "type": "string",
+            "description": "Complément d'adresse du centre (optionnel)",
+            "example": "BATIMENT 3"
+          },
+          "codePostal": {
+            "type": "string",
+            "description": "Code postal du centre",
+            "example": "11000"
+          },
+          "ville": {
+            "type": "string",
+            "description": "Ville du centre",
+            "example": "Carcasonne"
+          },
+          "estFerme": {
+            "type": "boolean",
+            "description": "Indique si le centre est fermé",
+            "example": false
+          }
+        },
+        "title": "Centre d'examen"
+      },
+      "CentreDuCreneauApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du centre",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d64"
+          },
+          "nom": {
+            "type": "string",
+            "description": "Nom du centre",
+            "example": "MIRANDA CARS"
+          }
+        },
+        "title": "Centre du créneau"
+      },
+      "CreneauApi": {
+        "type": "object",
+        "properties": {
+          "centre": {
+            "$ref": "#/components/schemas/CentreDuCreneauApi"
+          },
+          "numeroInspecteur": {
+            "type": "string",
+            "description": "Numéro (anonymisé) de l'inspecteur·rice",
+            "example": "1357"
+          },
+          "id": {
+            "type": "string",
+            "description": "Id technique du créneau",
+            "example": "7aad1453-6560-4d50-8fae-90b5ba73fa37"
+          },
+          "dateHeureDebut": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de début de l'épreuve (format ISO-8601)",
+            "example": "2019-10-04T08:00:00"
+          },
+          "dateHeureFin": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de fin de l'épreuve (format ISO-8601)",
+            "example": "2019-10-04T08:30:00"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "statutDeReservation": {
+            "type": "string",
+            "description": "Statut de réservation du créneau",
+            "enum": [
+              "DISPONIBLE",
+              "RÉSERVÉ_PAR_MON_AUTO_ÉCOLE",
+              "RÉSERVÉ_PAR_AUTRE_AUTO_ÉCOLE",
+              "SEUIL_ATTEINT"
+            ],
+            "example": "DISPONIBLE"
+          },
+          "typeEpreuvePratique": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Type d'épreuve pratique : pour le permis A -> PLATEAU ou CIRCULATION, pour le permis B -> null",
+            "enum": [
+              "PLATEAU",
+              "CIRCULATION"
+            ],
+            "example": "PLATEAU"
+          }
+        },
+        "title": "Créneau"
+      },
+      "ElementDuPanierAncienApi": {
+        "type": "object",
+        "properties": {
+          "creneau": {
+            "$ref": "#/components/schemas/CreneauApi"
+          },
+          "candidat": {
+            "$ref": "#/components/schemas/CandidatApi"
+          },
+          "estCandidatObligatoire": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Permet de savoir si le champs candidat est obligatoire ou pas, via l'input 'inclurEstCandidatObligatoire'.",
+            "example": false
+          }
+        },
+        "title": "Élément du panier Ancien"
+      },
+      "FiltrePanierAncienApi": {
+        "type": "object",
+        "properties": {
+          "codeDepartement": {
+            "type": "string",
+            "description": "Numéro du département",
+            "example": "011"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date de recherche (format ISO-8601)",
+            "example": "2019-10-07"
+          },
+          "centre": {
+            "$ref": "#/components/schemas/CentreApi"
+          }
+        },
+        "title": "Filtres du panier Ancien"
+      },
+      "PanierAncienApi": {
+        "type": "object",
+        "properties": {
+          "elementsDuPanier": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ElementDuPanierAncienApi"
+            }
+          },
+          "dateHeureExpiration": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure d'expiration du panier (format ISO-8601)",
+            "example": "2019-10-07T07:24:39Z"
+          },
+          "filtre": {
+            "$ref": "#/components/schemas/FiltrePanierAncienApi"
+          }
+        },
+        "title": "Panier Ancien"
+      },
+      "EmailNotificationAutoEcoleApi": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Nouvelle adresse e-mail de notification de l'auto-école",
+            "example": "test@mail.fr",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "AutoEcoleCompleteApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique de l'auto-école",
+            "example": "4b65c14a-0c14-4464-8b03-b4bc741d71b4"
+          },
+          "nom": {
+            "type": "string",
+            "description": "Raison sociale de l'auto-école",
+            "example": "Auto-Ecole de la Gare"
+          },
+          "emailNotification": {
+            "type": "string",
+            "description": "Adresse e-mail de notification de l'auto-école",
+            "example": "auto-ecole@alliance.com"
+          },
+          "codePostal": {
+            "type": "string",
+            "description": "Code postal de l'auto-école",
+            "example": "33000"
+          },
+          "estPlateforme": {
+            "type": "boolean",
+            "description": "Indique s'il s'agit d'une auto-école en ligne. Cette information n'a pas d'impact sur le fonctionnement de RdvPermis.",
+            "example": true
+          },
+          "formateursParDepartement": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NombreDeFormateurParDepartementApi"
+            }
+          },
+          "ville": {
+            "type": "string",
+            "description": "La ville de l'auto-école",
+            "example": "Toulouse"
+          },
+          "aurigeId": {
+            "type": "string",
+            "description": "Id technique de l'auto-école dans Aurige",
+            "example": "aurige-id"
+          },
+          "estBloquee": {
+            "type": "boolean",
+            "description": "Auto-ecole bloquée ou non",
+            "example": true
+          }
+        },
+        "title": "Auto-école complète"
+      },
+      "NombreDeFormateurParDepartementApi": {
+        "type": "object",
+        "properties": {
+          "codeDepartement": {
+            "type": "string",
+            "description": "Correspond au code de département",
+            "example": "033"
+          },
+          "nombreDeFormateursPermisB": {
+            "type": "number",
+            "format": "double",
+            "description": "Nombre de formateurs de l'auto-école dans un département pour la catégorie B. Ce nombre correspond au nombre d'heures d'enseignement réalisées mensuellement par les formateurs de l'auto-école divisé par 151,666.",
+            "example": 5.5
+          },
+          "nombreDeFormateursPermisA": {
+            "type": "number",
+            "format": "double",
+            "description": "Nombre de formateurs de l'auto-école dans un département pour la catégorie A. Ce nombre correspond au nombre d'heures d'enseignement réalisées mensuellement par les formateurs de l'auto-école divisé par 151,666.",
+            "example": 5.5
+          }
+        },
+        "required": [
+          "codeDepartement",
+          "nombreDeFormateursPermisA",
+          "nombreDeFormateursPermisB"
+        ]
+      },
+      "FiltreCreneauApi": {
+        "type": "object",
+        "properties": {
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "N'importe quel jour appartenant à la semaine sur laquelle effectuer la recherche (format ISO-8601) - les semaines commencent le lundi et finissent le dimanche.",
+            "example": "2022-01-04"
+          },
+          "centreId": {
+            "type": "string",
+            "description": "Id technique du centre",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d64"
+          }
+        },
+        "required": [
+          "centreId",
+          "date",
+          "groupePermis"
+        ],
+        "title": "Filtres de recherche de créneaux"
+      },
+      "RechercheCreneauApi": {
+        "type": "object",
+        "properties": {
+          "filtre": {
+            "$ref": "#/components/schemas/FiltreCreneauApi"
+          }
+        },
+        "title": "Rechercher un créneau"
+      },
+      "CreneauDuPlanningApi": {
+        "type": "object",
+        "properties": {
+          "centre": {
+            "$ref": "#/components/schemas/CentreDuCreneauApi",
+            "description": "Informations sur le centre d'examen"
+          },
+          "numeroInspecteur": {
+            "type": "string",
+            "description": "Numéro (anonymisé) de l'inspecteur ; ce numéro permet de savoir si une série de créneaux sera examinée par un même inspecteur et ainsi potentiellement mutualiser le véhicule utilisé.",
+            "example": "1357"
+          },
+          "id": {
+            "type": "string",
+            "description": "Id technique du créneau",
+            "example": "7aad1453-6560-4d50-8fae-90b5ba73fa37"
+          },
+          "dateHeureDebut": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de début de l'épreuve (format ISO-8601)",
+            "example": "2019-10-04T08:00:00"
+          },
+          "dateHeureFin": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de fin de l'épreuve (format ISO-8601)",
+            "example": "2019-10-04T08:30:00"
+          },
+          "dateHeurePublication": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de publication du créneau en UTC (format ISO-8601)",
+            "example": "2019-10-04T08:30:00Z"
+          },
+          "statutDeReservation": {
+            "type": "string",
+            "description": "Statut de réservation du créneau",
+            "enum": [
+              "DISPONIBLE",
+              "RÉSERVÉ_PAR_MON_AUTO_ÉCOLE",
+              "RÉSERVÉ_PAR_AUTRE_AUTO_ÉCOLE",
+              "SEUIL_ATTEINT"
+            ],
+            "example": "DISPONIBLE"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "typeEpreuvePratique": {
+            "type": "string",
+            "description": "Type d'épreuve pratique : pour le permis A -> PLATEAU ou CIRCULATION, pour le permis B -> null",
+            "enum": [
+              "PLATEAU",
+              "CIRCULATION"
+            ],
+            "example": "PLATEAU"
+          }
+        },
+        "title": "Créneau du planning"
+      },
+      "ElementDuPlanningApi": {
+        "type": "object",
+        "properties": {
+          "creneauDuPlanning": {
+            "$ref": "#/components/schemas/CreneauDuPlanningApi"
+          },
+          "examenDuPlanning": {
+            "$ref": "#/components/schemas/ExamenDuPlanningApi"
+          }
+        },
+        "title": "Element du planning"
+      },
+      "ExamenDuPlanningApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique de l'examen",
+            "example": "6060e828-bbce-4fbe-9cd4-c11d0df889cf"
+          },
+          "candidat": {
+            "$ref": "#/components/schemas/CandidatApi"
+          },
+          "estModifiable": {
+            "type": "boolean"
+          },
+          "estAnnule": {
+            "type": "boolean"
+          }
+        },
+        "title": "Examen du planning"
+      },
+      "CreerPanierApi": {
+        "type": "object",
+        "properties": {
+          "employeAutoEcoleId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Id technique de l'employé de l'auto-école pour qui le panier sera créé",
+            "example": "7c5a2a4b-afa3-4662-b55d-667bf54041a0"
+          }
+        },
+        "title": "Corps de la création de panier"
+      },
+      "CreneauNouveauApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du créneau",
+            "example": "7aad1453-6560-4d50-8fae-90b5ba73fa37"
+          },
+          "centreId": {
+            "type": "string",
+            "description": "Id technique du centre",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d64"
+          },
+          "numeroInspecteur": {
+            "type": "string",
+            "description": "Numéro (anonymisé) de l'inspecteur ; ce numéro permet de savoir si une série de créneaux sera examinée par un même inspecteur et ainsi potentiellement mutualiser le véhicule utilisé.",
+            "example": "1357"
+          },
+          "dateHeureDebut": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure locales de début de l'épreuve (format ISO-8601)",
+            "example": "2019-10-04T08:00:00+01:00"
+          },
+          "dateHeureFin": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure locales de fin de l'épreuve (format ISO-8601)",
+            "example": "2019-10-04T08:30:00+01:00"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "typeEpreuvePratique": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Type d'épreuve pratique: pour le permis A -> PLATEAU ou CIRCULATION, pour le permis B -> null",
+            "enum": [
+              "PLATEAU",
+              "CIRCULATION"
+            ],
+            "example": "PLATEAU"
+          }
+        },
+        "title": "Créneau Nouveau"
+      },
+      "ElementDuPanierNouveauApi": {
+        "type": "object",
+        "properties": {
+          "creneau": {
+            "$ref": "#/components/schemas/CreneauNouveauApi"
+          },
+          "candidat": {
+            "$ref": "#/components/schemas/CandidatApi"
+          },
+          "estCandidatObligatoire": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Permet de savoir si le champs candidat est obligatoire ou pas, via l'input 'inclurEstCandidatObligatoire'.",
+            "example": false
+          }
+        },
+        "title": "Élément du Panier Nouveau"
+      },
+      "PanierApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du nouveau panier créé",
+            "example": "e7ab4793-18ac-4a7a-8967-060c6a4f8df9"
+          },
+          "autoEcoleId": {
+            "type": "string",
+            "description": "Id technique de l'auto-école qui a créé le panier",
+            "example": "816dada7-310d-4f34-9033-197e35ff985a"
+          },
+          "employeAutoEcoleId": {
+            "type": "string",
+            "description": "Id technique de l'employé d'auto-école qui a créé le panier",
+            "example": "a99d6270-cda4-4971-bd3e-832f1a111c38"
+          },
+          "dateHeureCreation": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de création du panier (format ISO-8601)",
+            "example": "2019-10-07T07:00:00Z"
+          },
+          "dateHeureExpiration": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure d'expiration du panier (format ISO-8601) - un panier périme (= est automatiquement détruit) 30 minutes après sa création.",
+            "example": "2019-10-07T07:30:00Z"
+          },
+          "elementsDuPanier": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ElementDuPanierNouveauApi"
+            }
+          }
+        },
+        "title": "Panier Nouveau"
+      },
+      "ValidationPanierApi": {
+        "type": "object",
+        "properties": {
+          "panierId": {
+            "type": "string",
+            "description": "Id technique du panier",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d64"
+          },
+          "codeMessage": {
+            "type": "string",
+            "description": "Code de succès ou d'erreur lors de la validation du panier",
+            "enum": [
+              "PANIER_VALIDE_ET_SUPPRIME",
+              "PANIER_EN_ERREUR"
+            ],
+            "example": "PANIER_EN_ERREUR"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description de l'erreur ou du succès de la validation",
+            "example": "Certains créneaux du panier 264af7a0-bdc6-49b3-a567-bf4e09f55d64 n'ont pas été validés, par conséquent, le panier n'a pas été supprimé."
+          },
+          "contientAuMoinsUneErreur": {
+            "type": "boolean",
+            "description": "Indique si l'un des créneau du panier est en erreur",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationPanierCreneauApi"
+            }
+          }
+        },
+        "title": "Corps de réponse à la validation panier"
+      },
+      "ValidationPanierCreneauApi": {
+        "type": "object",
+        "properties": {
+          "creneauId": {
+            "type": "string",
+            "description": "Id technique du créneau",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d64"
+          },
+          "examenId": {
+            "type": "string",
+            "description": "Id technique de l'examen créé",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d24"
+          },
+          "codeMessage": {
+            "type": "string",
+            "description": "Code de succès ou d'erreur lors de la réservation du créneau",
+            "enum": [
+              "CRENEAU_RESERVE",
+              "CANDIDAT_SOUS_PENALITE",
+              "CANDIDAT_PAS_SOUS_MANDAT",
+              "VALIDATION_PANIER_TARDIVE",
+              "CRENEAU_DU_PANIER_SANS_CANDIDAT",
+              "CANDIDAT_EN_ATTENTE_DE_RESULTAT",
+              "EXAMEN_DEJA_PREVU_POUR_CANDIDAT",
+              "INSCRIPTION_EXAMEN_CIRCULATION_IMPOSSIBLE",
+              "ERREUR_INTERNE",
+              "VALIDATION_PANIER_CRENEAU_NON_DISPONIBLE",
+              "CANDIDAT_SANS_MANDAT_POUR_GROUPE_DEMANDE"
+            ],
+            "example": "CANDIDAT_PAS_SOUS_MANDAT"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description de l'erreur ou du succès de la réservation du créneau",
+            "example": "Le candidat n'est pas sous mandat."
+          },
+          "estReserve": {
+            "type": "boolean",
+            "description": "Indique si le créneau a été réservé",
+            "example": false
+          }
+        },
+        "title": "Créneau du panier suite à la validation"
+      },
+      "AjouterCreneauApi": {
+        "type": "object",
+        "properties": {
+          "creneauId": {
+            "type": "string",
+            "description": "Id technique du créneau à ajouter dans le panier.",
+            "example": "7aad1453-6560-4d50-8fae-90b5ba73fa37"
+          }
+        },
+        "required": [
+          "creneauId"
+        ],
+        "title": "Corps d'ajout de créneau au panier"
+      },
+      "AjouterCreneauxMultiplesApi": {
+        "type": "object",
+        "properties": {
+          "creneauxId": {
+            "type": "array",
+            "description": "Liste d'id techniques des créneaux à ajouter dans le panier.",
+            "example": [
+              "7aad1453-6560-4d50-8fae-90b5ba73fa37",
+              "7c5a2a4b-afa3-4662-b55d-667bf54041a0",
+              "6060e828-bbce-4fbe-9cd4-c11d0df889cf"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "creneauxId"
+        ],
+        "title": "Corps d'ajout de plusieurs créneaux au panier"
+      },
+      "CreneauxMultiplesNouveauPanierApi": {
+        "type": "object",
+        "properties": {
+          "crenauxIdsAjoutesAuPanierAvecSucces": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "crenauxIdsAjoutesAuPanierEnEchec": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "panier": {
+            "$ref": "#/components/schemas/PanierApi"
+          }
+        },
+        "title": "Créneaux multiples nouveau panier"
+      },
+      "CreneauxMultiplesAncienPanierApi": {
+        "type": "object",
+        "properties": {
+          "crenauxIdsAjoutesAuPanierAvecSucces": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "crenauxIdsAjoutesAuPanierEnEchec": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "panier": {
+            "$ref": "#/components/schemas/PanierAncienApi"
+          }
+        },
+        "title": "Créneaux ajoutés à l'ancien panier"
+      },
+      "CreerMandatApi": {
+        "type": "object",
+        "properties": {
+          "nom": {
+            "type": "string",
+            "description": "Nom du candidat",
+            "example": "Dupont",
+            "minLength": 1
+          },
+          "numeroDossier": {
+            "type": "string",
+            "description": "Numéro de dossier du candidat",
+            "example": "01234567890909",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "description": "Adresse e-mail du candidat (obligatoire si le candidat n'a pas de compte RdvPermis)",
+            "example": "louis.dupont@gmail.com"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B"
+            ],
+            "example": "A"
+          }
+        },
+        "required": [
+          "groupePermis",
+          "nom",
+          "numeroDossier"
+        ],
+        "title": "Corps création mandat"
+      },
+      "AutoEcoleApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique de l'auto-école",
+            "example": "4b65c14a-0c14-4464-8b03-b4bc741d71b4"
+          },
+          "raisonSociale": {
+            "type": "string",
+            "description": "Raison sociale de l'auto-école",
+            "example": "Auto-Ecole de la Gare"
+          }
+        },
+        "title": "Auto-école (simplifiée pour mandat)"
+      },
+      "AutoEcoleMandatApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du mandat",
+            "example": "4b65c14a-0c14-4464-8b03-b4bc741d71b4"
+          },
+          "candidatId": {
+            "type": "string",
+            "description": "Id technique du candidat",
+            "example": "6060e828-bbce-4fbe-9cd4-c11d0df889cf"
+          },
+          "autoEcole": {
+            "$ref": "#/components/schemas/AutoEcoleApi"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          }
+        },
+        "title": "Mandat"
+      },
+      "RemplacementExamenApi": {
+        "type": "object",
+        "properties": {
+          "candidatRemplacantId": {
+            "type": "string",
+            "description": "Id du nouveau candidat qui va être placé sur l'examen",
+            "example": "faa975a2-1fee-43e7-9886-25246726e273"
+          },
+          "examenId": {
+            "type": "string",
+            "description": "Id de l'examen sur lequel effectuer le remplacement.",
+            "example": "bbf8494f-0e7c-4d11-9946-014471f5cafd"
+          }
+        },
+        "required": [
+          "candidatRemplacantId",
+          "examenId"
+        ],
+        "title": "Corps du remplacement de candidat sur un examen"
+      },
+      "ExamenIdsAPermuterApi": {
+        "type": "object",
+        "properties": {
+          "examenId1": {
+            "type": "string",
+            "description": "Id du premier examen à permuter",
+            "example": "faa975a2-1fee-43e7-9886-25246726e273"
+          },
+          "examenId2": {
+            "type": "string",
+            "description": "Id du second examen à permuter",
+            "example": "bbf8494f-0e7c-4d11-9946-014471f5cafd"
+          }
+        },
+        "required": [
+          "examenId1",
+          "examenId2"
+        ],
+        "title": "Ids des examens à permuter"
+      },
+      "CreationCompteEmployeAutoEcoleApi": {
+        "type": "object",
+        "properties": {
+          "nom": {
+            "type": "string",
+            "description": "Nom de l'employé de l'auto-école",
+            "example": "Doe",
+            "pattern": "^[A-zÀ-ú- ']{1,50}$"
+          },
+          "prenom": {
+            "type": "string",
+            "description": "Prénom de l'employé de l'auto-école",
+            "example": "John",
+            "pattern": "^[A-zÀ-ú- ']{1,50}$"
+          },
+          "email": {
+            "type": "string",
+            "description": "Adresse e-mail de l'employé de l'auto-école",
+            "example": "john.doe@auto-ecole.fr",
+            "maxLength": 254,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "email",
+          "nom",
+          "prenom"
+        ],
+        "title": "Corps de création de compte employé"
+      },
+      "EmployeAutoEcoleApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique de l'employé",
+            "example": "employe-auto-ecole-1"
+          },
+          "nom": {
+            "type": "string",
+            "description": "Le nom de l'employé",
+            "example": "DUPONT"
+          },
+          "prenom": {
+            "type": "string",
+            "description": "Le prénom de l'employé",
+            "example": "Pierre"
+          },
+          "email": {
+            "type": "string",
+            "description": "L'adresse e-mail de l'employé",
+            "example": "dupontpierre@mail.com"
+          }
+        },
+        "title": "Employé d'auto-école"
+      },
+      "FiltreCentreApi": {
+        "type": "object",
+        "properties": {
+          "codeDepartement": {
+            "type": "string",
+            "description": "Numéro du département",
+            "example": "011"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "estFerme": {
+            "type": "boolean",
+            "description": "Filtre sur le statut du centre (ouvert/fermé). Si absent, tous les centres sont remontés.",
+            "example": true
+          }
+        },
+        "required": [
+          "codeDepartement",
+          "groupePermis"
+        ],
+        "title": "Filtres recherche de centre"
+      },
+      "RechercheCentreApi": {
+        "type": "object",
+        "properties": {
+          "filtre": {
+            "$ref": "#/components/schemas/FiltreCentreApi"
+          }
+        },
+        "title": "Corps de la recherche de centre"
+      },
+      "CentreFavoriInputApi": {
+        "type": "object",
+        "properties": {
+          "centreId": {
+            "type": "string",
+            "description": "Id technique du centre d'examen",
+            "example": "e23046a8-9cc4-49c1-ae27-eee6637c09bd"
+          },
+          "priorite": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Indice de priorité d'affichage (de 0 à 2, 0 étant le plus prioritaire)",
+            "example": 0
+          }
+        },
+        "title": "Centre d'examen favoris"
+      },
+      "GroupePermisCentresFavorisInputApi": {
+        "type": "object",
+        "properties": {
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis du centre d'examen",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "B"
+          },
+          "centresFavorisInput": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CentreFavoriInputApi"
+            }
+          }
+        }
+      },
+      "CritereDeRechercheNomApi": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Correspond à tout ou partie du nom de famille à rechercher, en fonction du paramètre `match`.",
+            "example": "Dupon"
+          },
+          "match": {
+            "type": "string",
+            "description": "Précise si le nom de famille renseigné dans `query` est exact ou partiel.",
+            "enum": [
+              "PARTIAL",
+              "EXACT"
+            ],
+            "example": "PARTIAL"
+          }
+        },
+        "title": "Critère de recherche par nom de famille"
+      },
+      "CritereDeRechercheNumeroDossierApi": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Correspond à tout ou partie du numéro de dossier à rechercher, en fonction du paramètre `match`.",
+            "example": "12345678901234"
+          },
+          "match": {
+            "type": "string",
+            "description": "Précise si le numéro de dossier renseigné dans `query` est exact ou partiel.",
+            "enum": [
+              "PARTIAL",
+              "EXACT"
+            ],
+            "example": "EXACT"
+          }
+        },
+        "title": "Critère de recherche par numéro de dossier"
+      },
+      "FiltreCandidatCreneauApi": {
+        "type": "object",
+        "description": "Paramètre de recherche des candidats sous mandat pour les positionner sur les créneaux.",
+        "properties": {
+          "nom": {
+            "$ref": "#/components/schemas/CritereDeRechercheNomApi"
+          },
+          "numeroDossier": {
+            "$ref": "#/components/schemas/CritereDeRechercheNumeroDossierApi"
+          },
+          "creneauId": {
+            "type": "string",
+            "description": "Id du créneau sur lequel positionner le candidat.",
+            "example": "c0aa0eec-4390-4db3-9c56-e98f7ccf7838",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "creneauId"
+        ],
+        "title": "Filtre de recherche candidat"
+      },
+      "RechercheCandidatApi": {
+        "type": "object",
+        "properties": {
+          "filtre": {
+            "$ref": "#/components/schemas/FiltreCandidatCreneauApi"
+          }
+        },
+        "required": [
+          "filtre"
+        ],
+        "title": "Corps de la recherche de candidats"
+      },
+      "CandidatAvecEligibiliteApi": {
+        "type": "object",
+        "properties": {
+          "candidat": {
+            "$ref": "#/components/schemas/CandidatApi"
+          },
+          "eligibilite": {
+            "$ref": "#/components/schemas/EligibiliteApi"
+          }
+        },
+        "title": "Candidat avec éligibilité"
+      },
+      "EligibiliteApi": {
+        "type": "object",
+        "properties": {
+          "estEligible": {
+            "type": "boolean",
+            "description": "Éligibilité du candidat",
+            "example": false
+          },
+          "codeMotif": {
+            "type": "string",
+            "description": "Code du motif de non éligibilité du candidat",
+            "enum": [
+              "CANDIDAT_AYANT_DEJA_OBTENU_SON_EXAMEN",
+              "CANDIDAT_DEJA_DANS_UN_PANIER",
+              "CANDIDAT_DEJA_INSCRIT_A_UN_EXAMEN",
+              "CANDIDAT_EN_ATTENTE_DE_RESULTAT",
+              "CANDIDAT_SANS_DEMANDE_ACTIVE",
+              "CANDIDAT_SOUS_PENALITE",
+              "CANDIDAT_NAYANT_PAS_LAGE_MINIMUM",
+              "DEMANDE_EN_DISPENSE_PRATIQUE",
+              "EXAMEN_PLATEAU_NI_REUSSI_NI_PROGRAMME",
+              "EXAMEN_PLATEAU_PREVU_A_MOINS_DE_4_JOURS",
+              "EXAMEN_PLATEAU_REUSSI",
+              "EXAMEN_PLATEAU_NON_REUSSI",
+              "MANDAT_INEXISTANT_POUR_GROUPE_DEMANDE",
+              "CANDIDAT_INELIGIBLE_PRATIQUE_DUREE_INDETERMINEE",
+              "CANDIDAT_INELIGIBLE_PRATIQUE_JUSQUA_DATE"
+            ],
+            "example": "CANDIDAT_EN_ATTENTE_DE_RESULTAT"
+          },
+          "motif": {
+            "type": "string",
+            "description": "Motif de non éligibilité du candidat",
+            "example": "En attente de résultat de l'examen du 07/07/2020"
+          }
+        },
+        "title": "Eligibilité d'un candidat à l'inscription à un examen"
+      },
+      "FiltreCandidatApi": {
+        "type": "object",
+        "properties": {
+          "nom": {
+            "$ref": "#/components/schemas/CritereDeRechercheNomApi"
+          },
+          "numeroDossier": {
+            "$ref": "#/components/schemas/CritereDeRechercheNumeroDossierApi"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          }
+        },
+        "required": [
+          "groupePermis"
+        ],
+        "title": "Filtre de recherche candidats sous mandat"
+      },
+      "RechercheCandidatEtPaginationApi": {
+        "type": "object",
+        "properties": {
+          "filtre": {
+            "$ref": "#/components/schemas/FiltreCandidatApi"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "default": 1,
+            "description": "Le numéro de la page de résultats qu'on veut consulter. 1 par défaut.",
+            "example": 2
+          },
+          "parPage": {
+            "type": "integer",
+            "format": "int32",
+            "default": 25,
+            "description": "Le nombre de résultats par page qu'on veut consulter. 25 par défaut. Doit être compris entre 1 et 100.",
+            "example": 50
+          }
+        },
+        "title": "Corps recherche paginée de candidats"
+      },
+      "AutoEcoleCandidatApi": {
+        "type": "object",
+        "properties": {
+          "candidat": {
+            "$ref": "#/components/schemas/CandidatApi"
+          },
+          "mandat": {
+            "$ref": "#/components/schemas/AutoEcoleMandatApi"
+          },
+          "penalites": {
+            "type": "array",
+            "description": "Aussi appelé délai de présentation.",
+            "items": {
+              "$ref": "#/components/schemas/PenaliteApi"
+            },
+            "title": "Pénalités"
+          },
+          "detailsResultats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetailsResultatApi"
+            }
+          }
+        },
+        "title": "Candidat, mandat et pénalités"
+      },
+      "DetailsResultatApi": {
+        "type": "object",
+        "properties": {
+          "categoriePermis": {
+            "type": "string",
+            "enum": [
+              "A",
+              "A1",
+              "A2",
+              "B",
+              "BE",
+              "B1",
+              "C",
+              "CE",
+              "C1",
+              "C1E",
+              "D",
+              "DE",
+              "D1",
+              "D1E"
+            ]
+          },
+          "derniereDateExamenTheorique": {
+            "type": "string",
+            "format": "date"
+          },
+          "derniereDateExamenPlateau": {
+            "type": "string",
+            "format": "date"
+          },
+          "statutExamenPlateau": {
+            "type": "string",
+            "enum": [
+              "EXAMEN_REUSSI",
+              "EXAMEN_ECHOUE",
+              "CANDIDAT_ABSENT",
+              "EXAMEN_ANNULE",
+              "CANDIDAT_NON_RECEVABLE",
+              "CANDIDAT_NON_EXAMINABLE"
+            ]
+          },
+          "derniereDateExamenCirculation": {
+            "type": "string",
+            "format": "date"
+          },
+          "statutExamenCirculation": {
+            "type": "string",
+            "enum": [
+              "EXAMEN_REUSSI",
+              "EXAMEN_ECHOUE",
+              "CANDIDAT_ABSENT",
+              "EXAMEN_ANNULE",
+              "CANDIDAT_NON_RECEVABLE",
+              "CANDIDAT_NON_EXAMINABLE"
+            ]
+          },
+          "nombreEchecsCirculation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nombreEchecsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seuilCritiqueNombreEchecsAtteint": {
+            "type": "boolean"
+          },
+          "examenJourJ": {
+            "type": "boolean"
+          },
+          "envoyeAuSnpc": {
+            "type": "boolean"
+          },
+          "resultatCirculationSupprime": {
+            "type": "boolean"
+          },
+          "resultatPlateauSupprime": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "nombreTotalPages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Nombre total de pages",
+            "example": 5
+          },
+          "pageCourante": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Page courante. La pagination commence à 1.",
+            "example": 1
+          },
+          "parPage": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Nombre d'éléments demandés par page.",
+            "example": 10
+          },
+          "nombreTotalElements": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Nombre total d'éléments.",
+            "example": 20
+          },
+          "nombreElementsPageCourante": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Nombre d'éléments de la page courante.",
+            "example": 10
+          }
+        },
+        "title": "Pagination"
+      },
+      "PaginationApiAutoEcoleCandidatApi": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoEcoleCandidatApi"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "PenaliteApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique de la pénalité",
+            "example": "6060e828-bbce-4fbe-9cd4-c11d0df889cf"
+          },
+          "motif": {
+            "type": "string",
+            "description": "Motif de la pénalité",
+            "enum": [
+              "ABSENCE",
+              "ANNULATION",
+              "ECHEC_EPREUVE_PRATIQUE"
+            ],
+            "example": "ANNULATION"
+          },
+          "dateExamen": {
+            "type": "string",
+            "format": "date",
+            "description": "Date de l'examen pour lequel la pénalité a été appliquée (format ISO-8601)",
+            "example": "2020-04-24"
+          },
+          "dateDeFin": {
+            "type": "string",
+            "format": "date",
+            "description": "Date de fin de la pénalité (format ISO-8601)",
+            "example": "2020-05-24"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis de l'examen pour lequel la pénalité a été appliquée",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "typeEpreuvePratique": {
+            "type": "string",
+            "description": "Type d'épreuve pratique de l'examen pour lequel la pénalité a été appliquée",
+            "enum": [
+              "PLATEAU",
+              "CIRCULATION"
+            ],
+            "example": "PLATEAU"
+          },
+          "dureeEnJour": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Durée, en jours, de la pénalité",
+            "example": 40
+          },
+          "statut": {
+            "type": "string",
+            "description": "Statut de la pénalité",
+            "enum": [
+              "LEVÉE",
+              "ACTIVE"
+            ],
+            "example": "LEVÉE"
+          },
+          "dateDeLevee": {
+            "type": "string",
+            "format": "date",
+            "description": "Date à laquelle la pénalité est levée (peut être `null`) (format ISO-8601) - à partir de cette date, le candidat peut de nouveau passer un examen.",
+            "example": "2020-04-28"
+          }
+        },
+        "title": "Pénalité"
+      },
+      "EtpApi": {
+        "type": "object",
+        "properties": {
+          "formateurParGroupePermis": {
+            "$ref": "#/components/schemas/EtpParGroupePermisApi"
+          },
+          "simulateurParGroupePermis": {
+            "$ref": "#/components/schemas/EtpParGroupePermisApi"
+          },
+          "formateurEtSimulateurParGroupePermis": {
+            "$ref": "#/components/schemas/EtpParGroupePermisApi"
+          }
+        },
+        "title": "Somme et nombre d'heure des ETP API"
+      },
+      "EtpGroupePermisApi": {
+        "type": "object",
+        "properties": {
+          "sommeEtp": {
+            "type": "number",
+            "format": "double"
+          },
+          "sommeHeures": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "EtpParGroupePermisApi": {
+        "type": "object",
+        "properties": {
+          "groupePermisA": {
+            "$ref": "#/components/schemas/EtpGroupePermisApi"
+          },
+          "groupePermisB": {
+            "$ref": "#/components/schemas/EtpGroupePermisApi"
+          },
+          "groupePermisCE": {
+            "$ref": "#/components/schemas/EtpGroupePermisApi"
+          }
+        }
+      },
+      "CodeSpecifiqueApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "libelle": {
+            "type": "string"
+          },
+          "precision1": {
+            "type": "string"
+          },
+          "precision2": {
+            "type": "string"
+          },
+          "parametreComplementaire": {
+            "type": "string"
+          }
+        },
+        "title": "Codes spécifiques du résultat pratique du candidat"
+      },
+      "CompetencesApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nombrePoints": {
+            "type": "number",
+            "format": "double"
+          },
+          "fauteEliminatoire": {
+            "type": "boolean"
+          },
+          "manoeuvreReussie": {
+            "type": "boolean"
+          }
+        },
+        "title": "Compétences du résultat pratique du candidat"
+      },
+      "DernierResultatPratiqueCandidatApi": {
+        "type": "object",
+        "properties": {
+          "candidat": {
+            "$ref": "#/components/schemas/CandidatApi"
+          },
+          "categoriePermis": {
+            "type": "string",
+            "enum": [
+              "A",
+              "A1",
+              "A2",
+              "B",
+              "BE",
+              "B1",
+              "C",
+              "CE",
+              "C1",
+              "C1E",
+              "D",
+              "DE",
+              "D1",
+              "D1E"
+            ]
+          },
+          "dernierResultatPratique": {
+            "$ref": "#/components/schemas/ResultatExamenPratiqueApi"
+          }
+        }
+      },
+      "DetailsApi": {
+        "type": "object",
+        "properties": {
+          "conduiteAccompagnee": {
+            "type": "boolean"
+          },
+          "conduiteSupervisee": {
+            "type": "boolean"
+          },
+          "demandeVisiteMedicale": {
+            "type": "boolean"
+          },
+          "nombrePointsTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "abandon": {
+            "type": "boolean"
+          },
+          "observation": {
+            "type": "string"
+          },
+          "competences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompetencesApi"
+            }
+          },
+          "codesSpecifiques": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeSpecifiqueApi"
+            }
+          }
+        },
+        "title": "Détails du résultat pratique du candidat"
+      },
+      "InspecteurApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique de l'inspecteur",
+            "example": "0cae3e8c-dacc-43e6-b042-528cf7bbca0b"
+          },
+          "matricule": {
+            "type": "string",
+            "description": "Matricule de l'inspecteur",
+            "example": "matricule-1"
+          },
+          "nom": {
+            "type": "string",
+            "description": "Nom de l'inspecteur",
+            "example": "Dupont"
+          },
+          "prenom": {
+            "type": "string",
+            "description": "Prénom de l'inspecteur",
+            "example": "Jean"
+          }
+        }
+      },
+      "ResultatExamenPratiqueApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "resultat": {
+            "type": "string",
+            "enum": [
+              "EXAMEN_REUSSI",
+              "EXAMEN_ECHOUE",
+              "CANDIDAT_ABSENT",
+              "EXAMEN_ANNULE",
+              "CANDIDAT_NON_RECEVABLE",
+              "CANDIDAT_NON_EXAMINABLE"
+            ]
+          },
+          "groupePermis": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ]
+          },
+          "categoriePermis": {
+            "type": "string",
+            "enum": [
+              "A",
+              "A1",
+              "A2",
+              "B",
+              "BE",
+              "B1",
+              "C",
+              "CE",
+              "C1",
+              "C1E",
+              "D",
+              "DE",
+              "D1",
+              "D1E"
+            ]
+          },
+          "typeEpreuvePratique": {
+            "type": "string",
+            "enum": [
+              "PLATEAU",
+              "CIRCULATION"
+            ]
+          },
+          "raisonSocialeAutoEcole": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "centre": {
+            "$ref": "#/components/schemas/CentreApi"
+          },
+          "inspecteur": {
+            "$ref": "#/components/schemas/InspecteurApi"
+          },
+          "details": {
+            "$ref": "#/components/schemas/DetailsApi"
+          },
+          "parcoursSensibilisationAFaire": {
+            "type": "boolean"
+          },
+          "cepcDisponible": {
+            "type": "boolean"
+          }
+        },
+        "title": "Résultat de l'examen pratique du candidat"
+      },
+      "PaginationApiPanierSansElementsApi": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PanierSansElementsApi"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "PanierSansElementsApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du panier",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d64"
+          },
+          "autoEcoleId": {
+            "type": "string",
+            "description": "Id technique de l'auto-école",
+            "example": "f1d7115d-5aa8-485e-ab56-c5e7e7ba18e8"
+          },
+          "employeAutoEcoleId": {
+            "type": "string",
+            "description": "Id technique de l'employé auto-école",
+            "example": "44fce497-513b-45a5-aefc-de89608d0c0d"
+          },
+          "dateHeureCreation": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de création du panier (format ISO-8601)",
+            "example": "2019-10-07T07:14:39Z"
+          },
+          "dateHeureExpiration": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure d'expiration du panier (format ISO-8601) - un panier périme (= est automatiquement détruit) 30 minutes après sa création.",
+            "example": "2019-10-07T07:44:39Z"
+          }
+        },
+        "title": "Panier sans éléments"
+      },
+      "OutputSeuilFormateur": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date demandée lors de la requête.",
+            "example": "2020-09-01"
+          },
+          "nombreDeFormateurs": {
+            "type": "number",
+            "format": "float",
+            "description": "Nombre de formateurs déclarés par l'auto-école sur le département et le groupe de permis considérés.",
+            "example": 4.5
+          },
+          "nombreExamensReservablesAvantSeuil": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Nombre d'examens réservables avant dépassement du seuil sur le département, pour le mois et le groupe de permis considérés.",
+            "example": 25
+          },
+          "nombrePlacesReservees": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Nombre d'examens réservés sur le département, pour le mois et le groupe de permis considérés.",
+            "example": 25
+          },
+          "seuilNombreExamensParMois": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Seuil du nombre d'examens par mois pour l'auto-école appelante sur le département et le groupe de permis considérés.",
+            "example": 50
+          },
+          "estSeuilAtteint": {
+            "type": "boolean",
+            "description": "Si l'auto-école a atteint son seuil de nombre d'examens par mois sur le département et le groupe de permis considérés.",
+            "example": false
+          },
+          "estPlafondAtteint": {
+            "type": "boolean",
+            "description": "Si l'auto-école a atteint son plafond de nombre d'examens par mois sur le département et le groupe de permis B.",
+            "example": false
+          },
+          "estPrioriteDepartementale": {
+            "type": "boolean",
+            "description": "Si l'auto-école ne possède pas d'affectation formateur sur le département et le groupe de permis considérés.",
+            "example": false
+          }
+        },
+        "title": "Informations seuil formateur"
+      },
+      "ExamenApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique de l'examen",
+            "example": "6060e828-bbce-4fbe-9cd4-c11d0df889cf"
+          },
+          "creneau": {
+            "$ref": "#/components/schemas/CreneauApi"
+          },
+          "candidat": {
+            "$ref": "#/components/schemas/CandidatApi"
+          },
+          "estModifiable": {
+            "type": "boolean"
+          },
+          "estAnnule": {
+            "type": "boolean"
+          }
+        },
+        "title": "Examen"
+      },
+      "RemplacementCandidatParAutoEcoleApi": {
+        "type": "object",
+        "properties": {
+          "remplacementsParMois": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remplacementsRestants": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "Corps du remplacement de candidat"
+      },
+      "PaginationApiExamenApi": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExamenApi"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "EmployeAutoEcolePaginationApi": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "description": "Liste des employés de l'auto-école",
+            "items": {
+              "$ref": "#/components/schemas/EmployeAutoEcoleApi"
+            }
+          }
+        }
+      },
+      "EmployeAvecAutoEcoleApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du l'employé de l'auto-école",
+            "example": "employe-auto-ecole-1"
+          },
+          "nom": {
+            "type": "string",
+            "description": "Nom de l'employé de l'auto-école",
+            "example": "Dupond"
+          },
+          "prenom": {
+            "type": "string",
+            "description": "Prénom de l'employé de l'auto-école",
+            "example": "Alexandre"
+          },
+          "email": {
+            "type": "string",
+            "description": "Adresse e-mail de l'employé de l'auto-école",
+            "example": "test@autoecole.fr"
+          },
+          "autoEcole": {
+            "$ref": "#/components/schemas/AutoEcoleCompleteApi"
+          }
+        },
+        "title": "Employé auto-école et auto-école"
+      },
+      "CreneauDisponibleApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique du créneau",
+            "example": "7aad1453-6560-4d50-8fae-90b5ba73fa37"
+          },
+          "centreId": {
+            "type": "string",
+            "description": "Id technique du centre",
+            "example": "264af7a0-bdc6-49b3-a567-bf4e09f55d64"
+          },
+          "numeroInspecteur": {
+            "type": "string",
+            "description": "Numéro (anonymisé) de l'inspecteur ; ce numéro permet de savoir si une série de créneaux sera examinée par un même inspecteur et ainsi potentiellement mutualiser le véhicule utilisé.",
+            "example": "1357"
+          },
+          "dateHeureDebut": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de début de l'épreuve (format ISO-8601)",
+            "example": "2019-10-04T08:00:00+01:00"
+          },
+          "dateHeureFin": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de fin de l'épreuve (format ISO-8601)",
+            "example": "2019-10-04T08:30:00+01:00"
+          },
+          "dateHeurePublication": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de publication du créneau en UTC (format ISO-8601)",
+            "example": "2019-10-04T08:30:00Z"
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "typeEpreuvePratique": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Type d'épreuve pratique : pour le permis A -> PLATEAU ou CIRCULATION, pour le permis B -> null",
+            "enum": [
+              "PLATEAU",
+              "CIRCULATION"
+            ],
+            "example": "PLATEAU"
+          },
+          "trancheHoraire": {
+            "type": "string",
+            "description": "Tranche horaire de la session appartenant au créneau",
+            "enum": [
+              "M1",
+              "M2",
+              "S1",
+              "S2"
+            ],
+            "example": "M1"
+          }
+        },
+        "title": "Créneau disponible"
+      },
+      "CentreFavoriApi": {
+        "type": "object",
+        "properties": {
+          "groupePermis": {
+            "type": "string",
+            "description": "Groupe de permis du centre d'examen",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "B"
+          },
+          "centreId": {
+            "type": "string",
+            "description": "Id technique du centre d'examen",
+            "example": "e23046a8-9cc4-49c1-ae27-eee6637c09bd"
+          },
+          "nomCentre": {
+            "type": "string",
+            "description": "Nom du centre d'examen",
+            "example": "MIRANDA CARS"
+          },
+          "codeDepartement": {
+            "type": "string",
+            "description": "Code département du centre d'examen",
+            "example": "091"
+          },
+          "nomDepartement": {
+            "type": "string",
+            "description": "Nom du département du centre d'examen",
+            "example": "Essonne"
+          },
+          "estFerme": {
+            "type": "boolean",
+            "description": "Statut du centre",
+            "example": false
+          },
+          "priorite": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Indice de priorité d'affichage (de 0 à 2, 0 étant le plus prioritaire)",
+            "example": 0
+          }
+        },
+        "title": "Centre d'examen favoris"
+      },
+      "SimulateurAffectationApi": {
+        "type": "object",
+        "properties": {
+          "codeDepartement": {
+            "type": "string"
+          },
+          "etp": {
+            "type": "number",
+            "format": "double"
+          },
+          "nbHeuresFormation": {
+            "type": "number",
+            "format": "double",
+            "description": "Nombre d'heures du formateur sur l'auto-école, le département et le groupe de permis.",
+            "example": 25.5
+          },
+          "groupePermis": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ]
+          },
+          "simulateur": {
+            "$ref": "#/components/schemas/SimulateurApi"
+          },
+          "dateHeureSuppression": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de suppression de l'affectation en UTC",
+            "example": "2024-04-01T10:00:00Z"
+          }
+        }
+      },
+      "SimulateurApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numeroAgrement": {
+            "type": "string"
+          },
+          "marque": {
+            "type": "string"
+          },
+          "modele": {
+            "type": "string"
+          },
+          "numeroSerie": {
+            "type": "string"
+          }
+        }
+      },
+      "FormateurAffectationApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id technique de l'affectation",
+            "example": "6060e828-bbce-4fbe-9cd4-c11d0df889cf"
+          },
+          "codeDepartement": {
+            "type": "string",
+            "description": "Code département de l'affectation",
+            "example": "034"
+          },
+          "formateur": {
+            "$ref": "#/components/schemas/FormateurApi"
+          },
+          "etp": {
+            "type": "number",
+            "format": "double"
+          },
+          "nbHeuresFormation": {
+            "type": "number",
+            "format": "double",
+            "description": "Nombre d'heures du formateur sur l'auto-école, le département et le groupe de permis.",
+            "example": 25.5
+          },
+          "groupePermis": {
+            "type": "string",
+            "description": "Catégorie de permis de l'affectation",
+            "enum": [
+              "A",
+              "B",
+              "CE"
+            ],
+            "example": "A"
+          },
+          "dateHeureSuppression": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date et heure de suppression de l'affectation en UTC",
+            "example": "2024-04-01T10:00:00Z"
+          }
+        },
+        "title": "FormateurAffectation"
+      },
+      "FormateurApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nom": {
+            "type": "string"
+          },
+          "prenom": {
+            "type": "string"
+          },
+          "autorisation": {
+            "type": "string"
+          }
+        },
+        "title": "Formateur"
+      }
+    },
+    "securitySchemes": {
+      "Access Token": {
+        "type": "http",
+        "description": "Authentification directement via l'access token, qui sera rajouté au header Authorization.",
+        "name": "Access Token",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "Formation": {
+        "type": "oauth2",
+        "description": "Authentification en tant qu'application cliente de type éditeur ou auto-école en ligne.",
+        "name": "Formation",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://recette.moncompte.permisdeconduire.gouv.fr/auth/realms/formation/protocol/openid-connect/token",
+            "scopes": {
+              "rdvpermis": "Accès à la réservation d'examen",
+              "livret_numerique:read": "Accès au livret numérique en lecture",
+              "livret_numerique:write": "Accès au livret numérique en écriture",
+              "offline_access": "Accès au compte en hors-ligne (pendant 2 mois)"
+            }
+          },
+          "authorizationCode": {
+            "authorizationUrl": "https://recette.moncompte.permisdeconduire.gouv.fr/auth/realms/formation/protocol/openid-connect/auth",
+            "tokenUrl": "https://recette.moncompte.permisdeconduire.gouv.fr/auth/realms/formation/protocol/openid-connect/token",
+            "scopes": {
+              "rdvpermis": "Accès à la réservation d'examen",
+              "livret_numerique:read": "Accès au livret numérique en lecture",
+              "livret_numerique:write": "Accès au livret numérique en écriture",
+              "offline_access": "Accès au compte en hors-ligne (pendant 2 mois)"
+            }
+          }
+        }
+      }
+    }
+  }
+}

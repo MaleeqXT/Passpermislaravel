@@ -152,6 +152,30 @@ class RdvPermisController extends Controller
         }
     }
 
+    public function trainerThreshold(Request $request, AutoEcoleService $autoEcole): JsonResponse
+    {
+        $validated = $request->validate([
+            'date' => ['bail', 'required', 'date_format:Y-m-d'],
+            'codeDepartement' => ['bail', 'required', 'string', 'max:10'],
+            'groupePermis' => ['bail', 'required', 'in:A,B'],
+        ]);
+
+        try {
+            $response = $autoEcole->trainerThreshold(
+                $request->user(),
+                $validated['date'],
+                $validated['codeDepartement'],
+                $validated['groupePermis'],
+            );
+
+            return response()->json($response->json(), $response->status());
+        } catch (RdvPermisApiException $exception) {
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
+        }
+    }
+
     private function frontendCallback(string $result): string
     {
         $url = config('rdvpermis.frontend_callback_url');

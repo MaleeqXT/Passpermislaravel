@@ -74,6 +74,20 @@ class ExamService
         return $this->client->post($user, self::EXAMS_PATH.'/permutation', compact('examenId1', 'examenId2'));
     }
 
+    /**
+     * Registers an eligible candidate on an already-reserved group A exam.
+     * Swagger (RECETTE, 2026-11-19) still exposes this operation on a v1 path,
+     * with both ids in the path and no request body; 200 has no documented body.
+     */
+    public function registerCandidate(User $user, string $examenId, string $candidatId): Response
+    {
+        return $this->client->request(
+            $user,
+            'PUT',
+            '/api/v1/auto-ecole/examen-programme/'.rawurlencode($examenId).'/candidat/'.rawurlencode($candidatId).'/validation',
+        );
+    }
+
     private function examPath(string $examenId): string
     {
         return self::EXAMS_PATH.'/'.$examenId;

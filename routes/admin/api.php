@@ -162,6 +162,9 @@ Route::middleware(['auth:sanctum', 'role:admin|super-admin|secretary', config('j
 
       Route::post('students/{student}/rdvpermis/mandate', [StudentMandateController::class, 'store'])
           ->name('students.rdvpermis.mandate');
+      // Local/testing only (the controller returns 404 elsewhere).
+      Route::get('students/{student}/rdvpermis/mandate/preview', [StudentMandateController::class, 'preview'])
+          ->name('students.rdvpermis.mandate.preview');
 
 
 
