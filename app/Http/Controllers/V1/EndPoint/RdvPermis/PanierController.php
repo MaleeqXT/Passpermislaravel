@@ -21,13 +21,32 @@ class PanierController extends Controller
             'employeAutoEcoleId' => ['nullable', 'uuid'],
         ]);
 
-        return $this->respond(fn () => $paniers->all($request->user(), [
-            'page' => $validated['page'] ?? 1,
-            'par-page' => $validated['parPage'] ?? 20,
-            ...(($validated['employeAutoEcoleId'] ?? null) === null ? [] : [
-                'employe-auto-ecole-id' => $validated['employeAutoEcoleId'],
-            ]),
-        ]));
+        try {
+            $response = $paniers->all($request->user(), [
+                'page' => $validated['page'] ?? 1,
+                'par-page' => $validated['parPage'] ?? 20,
+                ...(($validated['employeAutoEcoleId'] ?? null) === null ? [] : [
+                    'employe-auto-ecole-id' => $validated['employeAutoEcoleId'],
+                ]),
+            ]);
+            $body = $response->json();
+
+            if ($response->status() === 302) {
+                // RECETTE answers this list with 302 + the normal paginated body.
+                // Anything else under 302 is not a usable result.
+                if (! is_array($body) || ! array_key_exists('data', $body) || ! array_key_exists('pagination', $body)) {
+                    throw new RdvPermisApiException('La requête RdvPermis n’a pas pu être traitée.', 502, null, 302);
+                }
+
+                return response()->json($body, 200);
+            }
+
+            return response()->json($body, $response->status());
+        } catch (RdvPermisApiException $exception) {
+            return $this->providerError($exception);
+        } catch (\Throwable $exception) {
+            return $this->internalError($exception);
+        }
     }
 
     public function store(Request $request, PanierService $paniers): JsonResponse

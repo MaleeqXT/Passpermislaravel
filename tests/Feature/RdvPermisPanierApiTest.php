@@ -40,6 +40,26 @@ class RdvPermisPanierApiTest extends TestCase
             && $request->body() === '');
     }
 
+    public function test_recette_302_basket_list_with_a_paginated_body_is_returned_as_200(): void
+    {
+        $user = $this->signIn();
+        $this->bindToken($user);
+        $fixture = ['data' => [['id' => self::PANIER_ID]], 'pagination' => ['pageCourante' => 1, 'nombreTotalPages' => 1]];
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/paniers?page=1&par-page=10' => Http::response($fixture, 302)]);
+
+        $this->getJson('/api/rdvpermis/paniers?page=1&parPage=10')->assertOk()->assertExactJson($fixture);
+    }
+
+    public function test_a_302_basket_list_without_a_paginated_body_is_an_error(): void
+    {
+        $user = $this->signIn();
+        $this->bindToken($user);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/paniers?page=1&par-page=20' => Http::response(['private' => 'not-a-list'], 302)]);
+
+        $response = $this->getJson('/api/rdvpermis/paniers')->assertStatus(502)->assertJsonStructure(['message']);
+        $this->assertStringNotContainsString('not-a-list', $response->getContent());
+    }
+
     public function test_panier_list_forwards_verified_pagination_and_employee_filter(): void
     {
         $user = $this->signIn();

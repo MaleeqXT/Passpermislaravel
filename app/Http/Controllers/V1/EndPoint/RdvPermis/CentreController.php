@@ -5,6 +5,7 @@ namespace App\Http\Controllers\V1\EndPoint\RdvPermis;
 use App\Exceptions\RdvPermisApiException;
 use App\Http\Controllers\Controller;
 use App\Services\RdvPermis\CentreService;
+use App\Services\RdvPermis\DepartmentCode;
 use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ class CentreController extends Controller
 
         return $this->respond(fn () => $centres->search(
             $request->user(),
-            $validated['codeDepartement'],
+            DepartmentCode::normalize($validated['codeDepartement']),
             $validated['groupePermis'],
             $validated['estFerme'] ?? null,
         ));

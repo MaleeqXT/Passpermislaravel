@@ -6,6 +6,7 @@ use App\Exceptions\RdvPermisApiException;
 use App\Exceptions\RdvPermisOAuthException;
 use App\Http\Controllers\Controller;
 use App\Services\RdvPermis\AutoEcoleService;
+use App\Services\RdvPermis\DepartmentCode;
 use App\Services\RdvPermis\OAuthService;
 use App\Services\RdvPermis\TokenService;
 use Illuminate\Http\JsonResponse;
@@ -204,7 +205,7 @@ class RdvPermisController extends Controller
             $response = $autoEcole->trainerThreshold(
                 $request->user(),
                 $validated['date'],
-                $validated['codeDepartement'],
+                DepartmentCode::normalize($validated['codeDepartement']),
                 $validated['groupePermis'],
             );
 

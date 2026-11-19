@@ -14,9 +14,15 @@ class PanierService
 
     public function __construct(private readonly ApiClient $client) {}
 
+    /**
+     * Swagger documents 200, but RECETTE was observed (2026-11-19) answering
+     * the basket list with HTTP 302 and the normal paginated JSON body. That
+     * 302 is accepted here; PanierController::index decides whether the body
+     * is a usable list.
+     */
     public function all(User $user, array $query = []): Response
     {
-        return $this->client->get($user, self::PANIERS_PATH, $query);
+        return $this->client->request($user, 'GET', self::PANIERS_PATH, $query === [] ? [] : ['query' => $query], [302]);
     }
 
     public function create(User $user, ?string $employeAutoEcoleId = null): Response

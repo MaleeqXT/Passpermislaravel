@@ -47,6 +47,18 @@ class RdvPermisTrainerThresholdAndExamRegistrationTest extends TestCase
         Http::assertSent(fn ($request) => $request->method() === 'GET' && $request->url() === $url);
     }
 
+    public function test_trainer_threshold_pads_a_two_digit_department(): void
+    {
+        $user = $this->signIn();
+        $this->bindToken($user);
+        $url = 'https://api.example.test/api/v2/auto-ecole/informations-seuil-departement?date=2026-12-01&code-departement=075&groupe-permis=B';
+        Http::fake([$url => Http::response(['estSeuilAtteint' => false])]);
+
+        $this->getJson('/api/rdvpermis/seuil-formateur?date=2026-12-01&codeDepartement=75&groupePermis=B')->assertOk();
+
+        Http::assertSent(fn ($request) => $request->url() === $url);
+    }
+
     public function test_invalid_trainer_threshold_input_does_not_call_rdvpermis(): void
     {
         $this->signIn();

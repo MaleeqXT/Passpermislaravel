@@ -45,6 +45,18 @@ class RdvPermisCentreApiTest extends TestCase
             && $request->data() === ['filtre' => ['codeDepartement' => '091', 'groupePermis' => 'B', 'estFerme' => false]]);
     }
 
+    public function test_two_digit_departments_are_sent_on_three_digits(): void
+    {
+        $user = $this->signIn();
+        $this->bindToken($user, 3);
+        Http::fake(['https://api.example.test/api/v2/auto-ecole/centres/recherche' => Http::response([])]);
+
+        foreach ([['75', '075'], [' 9 ', '009'], ['2A', '2A']] as [$input, $sent]) {
+            $this->postJson('/api/rdvpermis/centres/recherche', ['codeDepartement' => $input, 'groupePermis' => 'B'])->assertOk();
+            Http::assertSent(fn ($request) => ($request->data()['filtre']['codeDepartement'] ?? null) === $sent);
+        }
+    }
+
     public function test_invalid_centre_input_does_not_call_rdvpermis(): void
     {
         $this->signIn();

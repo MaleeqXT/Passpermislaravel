@@ -14,7 +14,11 @@ class ApiClient
 {
     public function __construct(private readonly TokenService $tokens) {}
 
-    public function request(User $user, string $method, string $path, array $options = []): Response
+    /**
+     * @param  list<int>  $acceptedStatuses  non-2xx statuses a specific operation
+     *                                       treats as a normal provider answer
+     */
+    public function request(User $user, string $method, string $path, array $options = [], array $acceptedStatuses = []): Response
     {
         $baseUrl = rtrim((string) config('rdvpermis.api_url'), '/');
         if ($baseUrl === '') {
@@ -58,7 +62,7 @@ class ApiClient
             'status' => $response->status(),
         ]);
 
-        if (! $response->successful()) {
+        if (! $response->successful() && ! in_array($response->status(), $acceptedStatuses, true)) {
             if ($response->status() === 429) {
                 $retry = $cooldown->record('api', $user->getKey(), $response->header('Retry-After'));
                 throw new RdvPermisApiException('RdvPermis reçoit trop de demandes. Réessayez plus tard.', 429,
